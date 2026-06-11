@@ -55,6 +55,9 @@ enum Command {
     /// Send an urgent test toast notification.
     #[cfg(debug_assertions)]
     ToastTestUrgent,
+    /// Preview production controller notification variants.
+    #[cfg(debug_assertions)]
+    NotificationPreview,
 }
 
 pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
@@ -82,6 +85,8 @@ pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
         Some(Command::ToastTestHigh) => toast::test_high(),
         #[cfg(debug_assertions)]
         Some(Command::ToastTestUrgent) => toast::test_urgent(),
+        #[cfg(debug_assertions)]
+        Some(Command::NotificationPreview) => toast::preview(),
     }
 }
 

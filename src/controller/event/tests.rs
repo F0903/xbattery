@@ -20,6 +20,18 @@ fn connected_notifications_are_normal_urgency() {
 }
 
 #[test]
+fn connected_notifications_use_user_facing_copy() {
+    let event = ControllerEvent::Connected(controller(BatteryCharge::Coarse(BatteryLevel::Full)));
+    let notification = event
+        .notification(&ControllerNotificationPolicy::default())
+        .unwrap();
+
+    assert_eq!(notification.title(), "Xbox Controller Connected");
+    assert_eq!(notification.body(), "Battery level is ~100%");
+    assert!(!notification.body().contains("XInput"));
+}
+
+#[test]
 fn connected_notifications_can_be_disabled() {
     let event = ControllerEvent::Connected(controller(BatteryCharge::Coarse(BatteryLevel::Full)));
     let policy =
@@ -39,6 +51,21 @@ fn disconnected_notifications_can_be_disabled() {
 }
 
 #[test]
+fn disconnected_notifications_use_user_facing_copy() {
+    let event = ControllerEvent::Disconnected(controller(BatteryCharge::Coarse(BatteryLevel::Low)));
+    let notification = event
+        .notification(&ControllerNotificationPolicy::default())
+        .unwrap();
+
+    assert_eq!(notification.title(), "Xbox Controller Disconnected");
+    assert_eq!(
+        notification.body(),
+        "Controller disconnected. Last known battery level was ~25%"
+    );
+    assert!(!notification.body().contains("XInput"));
+}
+
+#[test]
 fn precise_critical_battery_notifications_are_urgent() {
     let event = ControllerEvent::BatteryWarning {
         current: controller(BatteryCharge::Precise(10)),
@@ -52,6 +79,21 @@ fn precise_critical_battery_notifications_are_urgent() {
             .urgency(),
         NotificationUrgency::Urgent
     );
+}
+
+#[test]
+fn precise_battery_notifications_use_user_facing_copy() {
+    let event = ControllerEvent::BatteryWarning {
+        current: controller(BatteryCharge::Precise(50)),
+        warning: BatteryWarning::Precise(50),
+    };
+    let notification = event
+        .notification(&ControllerNotificationPolicy::default())
+        .unwrap();
+
+    assert_eq!(notification.title(), "Xbox Controller Battery Status");
+    assert_eq!(notification.body(), "Battery level is 50%");
+    assert!(!notification.body().contains("XInput"));
 }
 
 #[test]
@@ -84,6 +126,21 @@ fn precise_urgency_threshold_can_be_configured() {
             .urgency(),
         NotificationUrgency::Urgent
     );
+}
+
+#[test]
+fn coarse_battery_notifications_use_user_facing_copy() {
+    let event = ControllerEvent::BatteryWarning {
+        current: controller(BatteryCharge::Coarse(BatteryLevel::Medium)),
+        warning: BatteryWarning::Coarse(BatteryLevel::Medium),
+    };
+    let notification = event
+        .notification(&ControllerNotificationPolicy::default())
+        .unwrap();
+
+    assert_eq!(notification.title(), "Xbox Controller Battery Status");
+    assert_eq!(notification.body(), "Battery level is ~50%");
+    assert!(!notification.body().contains("XInput"));
 }
 
 #[test]

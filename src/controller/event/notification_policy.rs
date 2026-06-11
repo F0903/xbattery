@@ -1,8 +1,9 @@
 use crate::{
     battery::{BatteryLevel, BatteryWarning},
-    controller::Controller,
     notifier::{Notification, NotificationUrgency},
 };
+
+const BATTERY_STATUS_TITLE: &str = "Xbox Controller Battery Status";
 
 #[derive(Clone, Debug)]
 pub struct ControllerNotificationPolicy {
@@ -38,29 +39,16 @@ impl ControllerNotificationPolicy {
         self.notify_disconnected
     }
 
-    pub(super) fn notification_for_battery_warning(
-        &self,
-        controller: &Controller,
-        warning: BatteryWarning,
-    ) -> Notification {
+    pub(super) fn notification_for_battery_warning(&self, warning: BatteryWarning) -> Notification {
         match warning {
             BatteryWarning::Precise(percent) => Notification::with_urgency(
-                format!("{} battery {}%", controller.name(), percent),
-                format!(
-                    "Current level: {}. Controller source: {}. Battery source: {}.",
-                    controller.battery().description(),
-                    controller.source().label(),
-                    controller.battery_source().label()
-                ),
+                BATTERY_STATUS_TITLE,
+                format!("Battery level is {percent}%"),
                 self.precise_warning_urgency(percent),
             ),
             BatteryWarning::Coarse(level) => Notification::with_urgency(
-                format!("{} battery {}", controller.name(), level),
-                format!(
-                    "Estimated level: {}%. Battery source: {} coarse battery state.",
-                    level.estimated_percent(),
-                    controller.battery_source().label()
-                ),
+                BATTERY_STATUS_TITLE,
+                format!("Battery level is ~{}%", level.estimated_percent()),
                 self.coarse_warning_urgency(level),
             ),
         }

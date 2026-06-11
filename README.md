@@ -152,6 +152,7 @@ For development diagnostics, use a debug build:
 cargo run -- probe
 cargo run -- gameinput-probe
 cargo run -- gameinput-watch
+cargo run -- notification-preview
 cargo run -- rumble-test
 cargo run -- rumble-test-thresholds
 ```
