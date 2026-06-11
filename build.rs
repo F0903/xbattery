@@ -1,4 +1,7 @@
-use std::{env, fs, path::PathBuf};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 const GAMEINPUT_PACKAGE_ID: &str = "Microsoft.GameInput";
 
@@ -27,7 +30,7 @@ fn main() {
 
     if !lib_dir.join("GameInput.lib").exists() {
         panic!(
-            "Microsoft.GameInput {} was not found. Run tools\\sync-gameinput.ps1.",
+            "Microsoft.GameInput {} was not found. Run `cargo xtask gameinput sync`.",
             package_version
         );
     }
@@ -36,16 +39,16 @@ fn main() {
     println!("cargo:rustc-link-lib=static=GameInput");
 }
 
-fn gameinput_package_version(manifest_dir: &PathBuf) -> String {
+fn gameinput_package_version(manifest_dir: &Path) -> String {
     let packages_config = manifest_dir.join("packages.config");
     let text = fs::read_to_string(&packages_config)
         .unwrap_or_else(|err| panic!("failed to read {}: {}", packages_config.display(), err));
 
     for line in text.lines() {
-        if line.contains("id=\"Microsoft.GameInput\"") {
-            if let Some(version) = attribute_value(line, "version") {
-                return version.to_string();
-            }
+        if line.contains("id=\"Microsoft.GameInput\"")
+            && let Some(version) = attribute_value(line, "version")
+        {
+            return version.to_string();
         }
     }
 

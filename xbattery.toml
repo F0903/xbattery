@@ -15,6 +15,26 @@ urgent_precise_threshold_percent = 10
 
 [rumble]
 enabled = false
-motor_strength_percent = 100
-pulse_millis = 150
-gap_millis = 100
+gap_millis = 45
+group_gap_millis = 200
+
+[rumble.jolts.quick]
+handle_strength_percent = 100
+trigger_strength_percent = 75
+handle_millis = 35
+trigger_millis = 50
+
+[rumble.jolts.strong]
+handle_strength_percent = 100
+trigger_strength_percent = 100
+handle_millis = 75
+trigger_millis = 100
+
+[rumble.patterns.medium]
+groups = [["quick", "quick"]]
+
+[rumble.patterns.low]
+groups = [["quick", "quick", "strong"]]
+
+[rumble.patterns.empty]
+groups = [["quick", "quick", "strong"], ["quick", "quick", "strong"]]

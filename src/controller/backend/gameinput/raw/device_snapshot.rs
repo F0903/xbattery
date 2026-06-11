@@ -5,23 +5,6 @@ use super::{
     constants::GAMEINPUT_DEVICE_CONNECTED,
 };
 
-#[derive(Clone, Copy, Debug)]
-pub struct GameInputDeviceEvent {
-    pub timestamp: u64,
-    pub current_status: i32,
-    pub previous_status: i32,
-}
-
-impl GameInputDeviceEvent {
-    pub fn current_status_description(self) -> String {
-        status_description(self.current_status)
-    }
-
-    pub fn previous_status_description(self) -> String {
-        status_description(self.previous_status)
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct GameInputDeviceSnapshot {
     pub id: String,
