@@ -1,0 +1,20 @@
+# Default xbattery configuration.
+
+[monitor]
+poll_interval_seconds = 60
+control_wait_slice_millis = 250
+
+[battery]
+precise_warning_thresholds = [50, 25, 10]
+
+[notifications]
+app_id = "xbattery"
+notify_connected = true
+notify_disconnected = true
+urgent_precise_threshold_percent = 10
+
+[rumble]
+enabled = false
+motor_strength_percent = 100
+pulse_millis = 150
+gap_millis = 100

@@ -1,0 +1,28 @@
+[package]
+name = "xbattery"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ctrlc = "3.5.2"
+serde = { version = "1.0.219", features = ["derive"] }
+toml = "0.8.23"
+windows = { version = "0.62.2", features = [
+	"Data_Xml_Dom",
+	"Devices_Power",
+	"Foundation",
+	"Foundation_Collections",
+	"Gaming_Input",
+	"UI_Notifications",
+	"Win32_Foundation",
+	"Win32_System_Com",
+	"Win32_UI_Input_XboxController",
+] }
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+panic = "abort"
+incremental = false
+codegen-units = 1
