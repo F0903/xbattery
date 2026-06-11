@@ -1,6 +1,6 @@
 # xbattery
 
-Lightweight Windows background monitor for Xbox controller battery notifications.
+Lightweight Windows background service for Xbox controller battery notifications.
 
 ## Current shape
 
@@ -39,7 +39,7 @@ Lightweight Windows background monitor for Xbox controller battery notifications
 ## Commands
 
 ```powershell
-.\tools\sync-gameinput.ps1
+cargo xtask gameinput sync
 cargo run -- probe
 cargo run -- gameinput-probe
 cargo run -- gameinput-watch
@@ -108,30 +108,30 @@ The Rust build links against the pinned `Microsoft.GameInput` NuGet package inst
 Install `nuget.exe` from the NuGet CLI downloads page and make sure it is on `PATH`. Then restore the package declared in `packages.config`:
 
 ```powershell
-.\tools\sync-gameinput.ps1
+cargo xtask gameinput sync
 ```
 
-The script runs `nuget.exe restore packages.config -PackagesDirectory packages`. The package cache is restored into `packages/`, which is ignored by git.
+The xtask runs `nuget.exe restore packages.config -PackagesDirectory packages`. The package cache is restored into `packages/`, which is ignored by git.
 
 To update the pinned GameInput package to the latest version published on NuGet:
 
 ```powershell
-.\tools\sync-gameinput.ps1 -Update
+cargo xtask gameinput update
 ```
 
 To pin a specific version:
 
 ```powershell
-.\tools\sync-gameinput.ps1 -Version 3.4.218
+cargo xtask gameinput pin 3.4.218
 ```
 
-For the PC runtime, install the redistributable bundled with the pinned NuGet package from an elevated PowerShell session:
+For the PC runtime, install the redistributable bundled with the pinned NuGet package:
 
 ```powershell
-.\tools\install-gameinput-redist.ps1
+cargo xtask gameinput redist
 ```
 
-This keeps the build-time package and runtime installer on the same GameInput version.
+This keeps the build-time package and runtime installer on the same GameInput version. The redist task uses `tools/run-elevated.ps1` as a small Windows elevation helper for `msiexec.exe`, so it can prompt for admin rights when needed.
 
 End users can also install or update the GameInput redistributable with Winget from an elevated prompt:
 
