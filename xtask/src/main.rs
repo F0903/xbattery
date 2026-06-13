@@ -2,6 +2,7 @@ use std::{env, process::Command};
 
 mod gameinput;
 mod process;
+mod release;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -19,6 +20,7 @@ fn main() -> Result<()> {
             Some("redist") => gameinput::redist(),
             Some(command) => Err(format!("unknown gameinput command: {command}").into()),
         },
+        Some("package-release") => release::package(),
         Some("check") => check(),
         Some("help") | Some("--help") | Some("-h") | None => {
             print_help();
@@ -45,5 +47,6 @@ fn print_help() {
     println!(
         "  gameinput redist        Install the pinned GameInput redist through elevation helper"
     );
+    println!("  package-release         Build release exe and zip it for GitHub Releases");
     println!("  check                   Run cargo fmt --check, cargo test, and cargo build");
 }

@@ -6,6 +6,7 @@ mod monitor;
 mod rumble;
 #[cfg(debug_assertions)]
 mod toast;
+mod update;
 
 use clap::{Parser, Subcommand};
 use xbattery::AppResult;
@@ -29,6 +30,14 @@ enum Command {
     Uninstall,
     /// Print startup task and installed file status.
     Status,
+    /// Check GitHub Releases for a newer xbattery version.
+    CheckUpdate,
+    /// Update the installed xbattery executable from GitHub Releases.
+    Update {
+        /// Check what would be updated without changing installed files.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Use GameInput events first, with polling fallback.
     Monitor,
     /// Print XInput and Windows.Gaming.Input battery reports once.
@@ -68,6 +77,8 @@ pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
         Some(Command::Install { force }) => install::install(false, force),
         Some(Command::Uninstall) => install::uninstall(false),
         Some(Command::Status) => install::status(),
+        Some(Command::CheckUpdate) => update::check(),
+        Some(Command::Update { dry_run }) => update::run(dry_run),
         Some(Command::Monitor) => monitor::run(),
         #[cfg(debug_assertions)]
         Some(Command::Probe) => diagnostics::probe(),

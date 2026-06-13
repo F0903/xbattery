@@ -60,7 +60,7 @@ fn disconnected_notifications_use_user_facing_copy() {
     assert_eq!(notification.title(), "Xbox Controller Disconnected");
     assert_eq!(
         notification.body(),
-        "Controller disconnected. Last known battery level was ~25%"
+        "Controller has been disconnected. Last known battery level was ~25%"
     );
     assert!(!notification.body().contains("XInput"));
 }

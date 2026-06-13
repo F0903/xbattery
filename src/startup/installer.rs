@@ -1,4 +1,4 @@
-use std::{env, fs, process::Command};
+use std::{env, fs, path::Path, process::Command};
 
 use super::{
     InstallReport, StartupStatus, UninstallReport, paths::StartupPaths,
@@ -70,6 +70,25 @@ impl StartupInstaller {
         }
     }
 
+    pub fn installed_exe(&self) -> &Path {
+        &self.paths.installed_exe
+    }
+
+    pub fn start_monitor(&self) -> AppResult<()> {
+        let mut command = Command::new(&self.paths.installed_exe);
+        command.arg("monitor");
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            command.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        command.spawn()?;
+        Ok(())
+    }
+
     fn copy_exe(&self) -> AppResult<()> {
         let current_exe = env::current_exe()?;
 
@@ -92,21 +111,6 @@ impl StartupInstaller {
             fs::write(&self.paths.installed_config, DEFAULT_CONFIG)?;
         }
 
-        Ok(())
-    }
-
-    fn start_monitor(&self) -> AppResult<()> {
-        let mut command = Command::new(&self.paths.installed_exe);
-        command.arg("monitor");
-
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            command.creation_flags(CREATE_NO_WINDOW);
-        }
-
-        command.spawn()?;
         Ok(())
     }
 }

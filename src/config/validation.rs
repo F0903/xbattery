@@ -41,6 +41,22 @@ pub(super) fn validate(config: &AppConfig) -> AppResult<()> {
         return Err("rumble.group_gap_millis must be greater than zero".into());
     }
 
+    if config.updates.repo_owner.trim().is_empty() {
+        return Err("updates.repo_owner must not be empty".into());
+    }
+
+    if config.updates.repo_name.trim().is_empty() {
+        return Err("updates.repo_name must not be empty".into());
+    }
+
+    if config.updates.asset_identifier.trim().is_empty() {
+        return Err("updates.asset_identifier must not be empty".into());
+    }
+
+    if config.updates.bin_path_in_archive.trim().is_empty() {
+        return Err("updates.bin_path_in_archive must not be empty".into());
+    }
+
     config.rumble.controller_rumble_config()?;
 
     Ok(())

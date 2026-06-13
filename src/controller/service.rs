@@ -111,6 +111,10 @@ where
     }
 
     pub fn run_until_ctrl_c(&mut self) -> AppResult<()> {
+        self.run_until_ctrl_c_or(|| false)
+    }
+
+    pub fn run_until_ctrl_c_or(&mut self, should_stop: impl Fn() -> bool) -> AppResult<()> {
         let running = Arc::new(AtomicBool::new(true));
         let running_signal = Arc::clone(&running);
 
@@ -120,13 +124,14 @@ where
 
         match self.input.start_event_stream() {
             Ok(stream) => {
-                if let Err(_event_error) = self.run_backend_event_loop(&running, stream)
-                    && running.load(Ordering::SeqCst)
+                if let Err(_event_error) =
+                    self.run_backend_event_loop(&running, &should_stop, stream)
+                    && active(&running, &should_stop)
                 {
-                    self.run_polling_loop(&running)?;
+                    self.run_polling_loop(&running, &should_stop)?;
                 }
             }
-            Err(_start_error) => self.run_polling_loop(&running)?,
+            Err(_start_error) => self.run_polling_loop(&running, &should_stop)?,
         }
 
         Ok(())
@@ -135,9 +140,10 @@ where
     fn run_backend_event_loop(
         &mut self,
         running: &AtomicBool,
+        should_stop: &impl Fn() -> bool,
         stream: BackendEventStream,
     ) -> AppResult<()> {
-        while running.load(Ordering::SeqCst) {
+        while active(running, should_stop) {
             match stream.recv_timeout(self.config.control_wait_slice) {
                 Ok(event) => self.process_backend_event(event)?,
                 Err(RecvTimeoutError::Timeout) => {}
@@ -150,17 +156,39 @@ where
         Ok(())
     }
 
-    fn run_polling_loop(&mut self, running: &AtomicBool) -> AppResult<()> {
+    fn run_polling_loop(
+        &mut self,
+        running: &AtomicBool,
+        should_stop: &impl Fn() -> bool,
+    ) -> AppResult<()> {
         self.poll_and_notify()?;
 
-        while running.load(Ordering::SeqCst) {
-            thread::sleep(self.config.poll_interval);
-            if running.load(Ordering::SeqCst) {
-                self.poll_and_notify()?;
+        while active(running, should_stop) {
+            if !self.wait_for_next_poll(running, should_stop) {
+                break;
             }
+
+            self.poll_and_notify()?;
         }
 
         Ok(())
+    }
+
+    fn wait_for_next_poll(&self, running: &AtomicBool, should_stop: &impl Fn() -> bool) -> bool {
+        let mut elapsed = Duration::ZERO;
+
+        while elapsed < self.config.poll_interval {
+            if !active(running, should_stop) {
+                return false;
+            }
+
+            let remaining = self.config.poll_interval - elapsed;
+            let sleep_for = remaining.min(self.config.control_wait_slice);
+            thread::sleep(sleep_for);
+            elapsed += sleep_for;
+        }
+
+        active(running, should_stop)
     }
 
     fn poll_and_notify(&mut self) -> AppResult<()> {
@@ -189,4 +217,8 @@ where
 
         Ok(())
     }
+}
+
+fn active(running: &AtomicBool, should_stop: &impl Fn() -> bool) -> bool {
+    running.load(Ordering::SeqCst) && !should_stop()
 }

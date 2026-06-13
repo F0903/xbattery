@@ -18,6 +18,7 @@ fn parses_partial_config_with_defaults() {
     assert!(!config.rumble.enabled);
     assert_eq!(config.monitor.poll_interval_seconds, 60);
     assert_eq!(config.battery.precise_warning_thresholds, vec![50, 25, 10]);
+    assert_eq!(config.updates.repo_name, "xbattery");
 }
 
 #[test]
@@ -106,6 +107,40 @@ fn rejects_unknown_rumble_pattern_jolts() {
     let error = config.validate().unwrap_err();
 
     assert!(error.to_string().contains("unknown jolt"));
+}
+
+#[test]
+fn parses_update_config() {
+    let config = toml::from_str::<AppConfig>(
+        r#"
+        [updates]
+        repo_owner = "owner"
+        repo_name = "repo"
+        asset_identifier = "asset"
+        bin_path_in_archive = "bin/xbattery.exe"
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(config.updates.repo_owner, "owner");
+    assert_eq!(config.updates.repo_name, "repo");
+    assert_eq!(config.updates.asset_identifier, "asset");
+    assert_eq!(config.updates.bin_path_in_archive, "bin/xbattery.exe");
+}
+
+#[test]
+fn rejects_empty_update_repo_owner() {
+    let config = toml::from_str::<AppConfig>(
+        r#"
+        [updates]
+        repo_owner = ""
+        "#,
+    )
+    .unwrap();
+
+    let error = config.validate().unwrap_err();
+
+    assert!(error.to_string().contains("updates.repo_owner"));
 }
 
 #[test]

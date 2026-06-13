@@ -1,6 +1,9 @@
 use serde::Deserialize;
 
-use super::{BatteryConfig, MonitorConfig, NotificationsConfig, RumbleConfig, loader, validation};
+use super::{
+    BatteryConfig, MonitorConfig, NotificationsConfig, RumbleConfig, UpdatesConfig, loader,
+    validation,
+};
 use crate::{
     AppResult,
     battery::BatteryWarningPolicy,
@@ -15,6 +18,7 @@ pub struct AppConfig {
     pub battery: BatteryConfig,
     pub notifications: NotificationsConfig,
     pub rumble: RumbleConfig,
+    pub updates: UpdatesConfig,
 }
 
 impl AppConfig {

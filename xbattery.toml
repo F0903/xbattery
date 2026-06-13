@@ -13,6 +13,12 @@ notify_connected = true
 notify_disconnected = true
 urgent_precise_threshold_percent = 10
 
+[updates]
+repo_owner = "F0903"
+repo_name = "xbattery"
+asset_identifier = "xbattery"
+bin_path_in_archive = "xbattery.exe"
+
 [rumble]
 enabled = false
 gap_millis = 45

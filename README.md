@@ -37,10 +37,15 @@ Useful commands:
 xbattery.exe install
 xbattery.exe install --force
 xbattery.exe status
+xbattery.exe check-update
+xbattery.exe update
+xbattery.exe update --dry-run
 xbattery.exe uninstall
 ```
 
 `uninstall` removes the startup task but leaves the installed files and config in place.
+
+`check-update` looks for a newer GitHub Release. `update` downloads the matching release asset, stops the background monitor, replaces the installed executable, and restarts the monitor if it was running. Use `update --dry-run` to check what would happen without changing files.
 
 ## Configuration
 
@@ -63,6 +68,12 @@ precise_warning_thresholds = [50, 25, 10]
 notify_connected = true
 notify_disconnected = true
 urgent_precise_threshold_percent = 10
+
+[updates]
+repo_owner = "F0903"
+repo_name = "xbattery"
+asset_identifier = "xbattery"
+bin_path_in_archive = "xbattery.exe"
 
 [rumble]
 enabled = false
@@ -132,6 +143,21 @@ The release executable is:
 
 ```text
 target\release\xbattery.exe
+```
+
+To build the zip asset used by the self-updater:
+
+```powershell
+cargo xtask package-release
+```
+
+Upload the generated `target\dist\xbattery-v<version>-x86_64-pc-windows-msvc.zip` file to the matching GitHub Release. The zip must contain `xbattery.exe` at the archive root, which is what `bin_path_in_archive = "xbattery.exe"` points to.
+
+GitHub Actions also publishes this asset automatically when a `v<version>` tag is pushed. The tag version must match `Cargo.toml`.
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 To install or update the GameInput runtime from this repo:

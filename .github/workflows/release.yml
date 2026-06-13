@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release, for example v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Windows Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: tag
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ inputs.tag }}"
+          } else {
+            $tag = "${{ github.ref_name }}"
+          }
+
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Release tag must look like v0.1.0, got '$tag'"
+          }
+
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "version=$($tag.TrimStart('v'))" >> $env:GITHUB_OUTPUT
+
+      - name: Checkout release tag
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          git fetch --tags --force
+          git checkout --force "${{ steps.tag.outputs.tag }}"
+
+      - name: Validate Cargo version
+        shell: pwsh
+        run: |
+          $cargoToml = Get-Content Cargo.toml -Raw
+          $match = [regex]::Match($cargoToml, '(?m)^version\s*=\s*"([^"]+)"')
+          if (!$match.Success) {
+            throw "Could not find package version in Cargo.toml"
+          }
+
+          $cargoVersion = $match.Groups[1].Value
+          $tagVersion = "${{ steps.tag.outputs.version }}"
+          if ($cargoVersion -ne $tagVersion) {
+            throw "Cargo.toml version '$cargoVersion' does not match tag version '$tagVersion'"
+          }
+
+      - name: Install Rust
+        shell: pwsh
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup component add rustfmt clippy
+
+      - name: Restore cargo cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            packages
+          key: windows-release-${{ hashFiles('Cargo.lock', 'packages.config') }}
+          restore-keys: |
+            windows-release-
+            windows-cargo-
+
+      - name: Restore GameInput
+        shell: pwsh
+        run: cargo xtask gameinput sync
+
+      - name: Format
+        shell: pwsh
+        run: cargo fmt --all -- --check
+
+      - name: Test
+        shell: pwsh
+        run: cargo test --workspace
+
+      - name: Clippy
+        shell: pwsh
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Package release asset
+        shell: pwsh
+        run: cargo xtask package-release
+
+      - name: Validate release asset
+        id: asset
+        shell: pwsh
+        run: |
+          $version = "${{ steps.tag.outputs.version }}"
+          $asset = "target\dist\xbattery-v$version-x86_64-pc-windows-msvc.zip"
+          if (!(Test-Path $asset)) {
+            throw "Release asset was not created: $asset"
+          }
+
+          $entries = tar -tf $asset
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not inspect release asset: $asset"
+          }
+          if ($entries -notcontains "xbattery.exe") {
+            throw "Release asset must contain xbattery.exe at the archive root"
+          }
+
+          "path=$asset" >> $env:GITHUB_OUTPUT
+          "name=$(Split-Path $asset -Leaf)" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ steps.tag.outputs.tag }}"
+          $asset = "${{ steps.asset.outputs.path }}"
+
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $asset --clobber
+          } else {
+            gh release create $tag $asset --title $tag --generate-notes --verify-tag
+          }

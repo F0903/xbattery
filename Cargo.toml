@@ -17,6 +17,12 @@ clap = { version = "4.5", default-features = false, features = [
 ] }
 ctrlc = "3.5.2"
 serde = { version = "1.0.219", features = ["derive"] }
+self_update = { version = "0.44", default-features = false, features = [
+	"archive-zip",
+	"compression-zip-deflate",
+	"rustls",
+	"ureq",
+] }
 toml = "0.8.23"
 windows = { version = "0.62.2", features = [
 	"Data_Xml_Dom",

@@ -56,7 +56,9 @@ fn connected_body(battery: BatteryReading) -> String {
 
 fn disconnected_body(battery: BatteryReading) -> String {
     match battery_level_text(battery) {
-        Some(level) => format!("Controller has been disconnected. Last known battery level was {level}"),
+        Some(level) => {
+            format!("Controller has been disconnected. Last known battery level was {level}")
+        }
         None => "Controller has been disconnected".to_string(),
     }
 }
