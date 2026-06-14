@@ -57,6 +57,10 @@ pub(super) fn validate(config: &AppConfig) -> AppResult<()> {
         return Err("updates.bin_path_in_archive must not be empty".into());
     }
 
+    if config.updates.check_interval_hours == 0 {
+        return Err("updates.check_interval_hours must be greater than zero".into());
+    }
+
     config.rumble.controller_rumble_config()?;
 
     Ok(())

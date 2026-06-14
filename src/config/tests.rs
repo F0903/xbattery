@@ -19,6 +19,10 @@ fn parses_partial_config_with_defaults() {
     assert_eq!(config.monitor.poll_interval_seconds, 60);
     assert_eq!(config.battery.precise_warning_thresholds, vec![50, 25, 10]);
     assert_eq!(config.updates.repo_name, "xbattery");
+    assert!(config.updates.check_automatically);
+    assert_eq!(config.updates.check_interval_hours, 24);
+    assert!(!config.updates.auto_install);
+    assert!(config.updates.notify_available);
 }
 
 #[test]
@@ -118,6 +122,10 @@ fn parses_update_config() {
         repo_name = "repo"
         asset_identifier = "asset"
         bin_path_in_archive = "bin/xbattery.exe"
+        check_automatically = false
+        check_interval_hours = 12
+        auto_install = true
+        notify_available = false
         "#,
     )
     .unwrap();
@@ -126,6 +134,10 @@ fn parses_update_config() {
     assert_eq!(config.updates.repo_name, "repo");
     assert_eq!(config.updates.asset_identifier, "asset");
     assert_eq!(config.updates.bin_path_in_archive, "bin/xbattery.exe");
+    assert!(!config.updates.check_automatically);
+    assert_eq!(config.updates.check_interval_hours, 12);
+    assert!(config.updates.auto_install);
+    assert!(!config.updates.notify_available);
 }
 
 #[test]
@@ -141,6 +153,21 @@ fn rejects_empty_update_repo_owner() {
     let error = config.validate().unwrap_err();
 
     assert!(error.to_string().contains("updates.repo_owner"));
+}
+
+#[test]
+fn rejects_zero_update_check_interval() {
+    let config = toml::from_str::<AppConfig>(
+        r#"
+        [updates]
+        check_interval_hours = 0
+        "#,
+    )
+    .unwrap();
+
+    let error = config.validate().unwrap_err();
+
+    assert!(error.to_string().contains("updates.check_interval_hours"));
 }
 
 #[test]

@@ -33,6 +33,10 @@ impl CheckUpdateReport {
             None => format!("xbattery is up to date: {}", self.current_version),
         }
     }
+
+    pub fn latest_version(&self) -> Option<&str> {
+        self.latest_version.as_deref()
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

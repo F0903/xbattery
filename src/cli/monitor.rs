@@ -5,6 +5,7 @@ use xbattery::{
     monitor_control::{MONITOR_MUTEX_NAME, MonitorStopEvent},
     notifier::ToastNotifier,
     single_instance::SingleInstance,
+    update,
 };
 
 pub(super) fn run() -> AppResult<()> {
@@ -17,9 +18,9 @@ pub(super) fn run() -> AppResult<()> {
     stop_event.reset()?;
 
     let config = AppConfig::load()?;
-    let mut service = ControllerService::new(
-        ToastNotifier::new(config.toast_config()),
-        config.controller_service_config()?,
-    );
+    let notifier = ToastNotifier::new(config.toast_config());
+    update::start_background_checks(config.updates.clone(), notifier.clone())?;
+
+    let mut service = ControllerService::new(notifier, config.controller_service_config()?);
     service.run_until_ctrl_c_or(|| stop_event.is_signaled())
 }

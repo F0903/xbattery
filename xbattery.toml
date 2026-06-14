@@ -18,6 +18,10 @@ repo_owner = "F0903"
 repo_name = "xbattery"
 asset_identifier = "xbattery"
 bin_path_in_archive = "xbattery.exe"
+check_automatically = true
+check_interval_hours = 24
+auto_install = false
+notify_available = true
 
 [rumble]
 enabled = false

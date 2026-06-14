@@ -47,6 +47,8 @@ xbattery.exe uninstall
 
 `check-update` looks for a newer GitHub Release. `update` downloads the matching release asset, stops the background monitor, replaces the installed executable, and restarts the monitor if it was running. Use `update --dry-run` to check what would happen without changing files.
 
+The background monitor also checks for updates once a day by default. It shows a toast when a new version is available. Set `updates.auto_install = true` if you want xbattery to install those updates automatically.
+
 ## Configuration
 
 After install, edit:
@@ -74,6 +76,10 @@ repo_owner = "F0903"
 repo_name = "xbattery"
 asset_identifier = "xbattery"
 bin_path_in_archive = "xbattery.exe"
+check_automatically = true
+check_interval_hours = 24
+auto_install = false
+notify_available = true
 
 [rumble]
 enabled = false
