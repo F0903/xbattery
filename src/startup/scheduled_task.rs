@@ -3,7 +3,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use super::TASK_NAME;
+use super::{StartupAccessDenied, TASK_NAME};
 use crate::AppResult;
 
 #[derive(Clone, Debug)]
@@ -18,16 +18,19 @@ impl ScheduledTask {
 
     pub(super) fn create(&self, executable: &Path) -> AppResult<()> {
         let task_command = format!("\"{}\" monitor", executable.display());
-        run_schtasks([
-            "/Create",
-            "/TN",
-            self.name,
-            "/SC",
-            "ONLOGON",
-            "/TR",
-            &task_command,
-            "/F",
-        ])
+        run_schtasks(
+            "create the xbattery startup task",
+            [
+                "/Create",
+                "/TN",
+                self.name,
+                "/SC",
+                "ONLOGON",
+                "/TR",
+                &task_command,
+                "/F",
+            ],
+        )
     }
 
     pub(super) fn delete(&self) -> AppResult<bool> {
@@ -35,7 +38,10 @@ impl ScheduledTask {
             return Ok(false);
         }
 
-        run_schtasks(["/Delete", "/TN", self.name, "/F"])?;
+        run_schtasks(
+            "remove the xbattery startup task",
+            ["/Delete", "/TN", self.name, "/F"],
+        )?;
         Ok(true)
     }
 
@@ -49,7 +55,10 @@ impl ScheduledTask {
     }
 }
 
-fn run_schtasks<'a>(args: impl IntoIterator<Item = &'a str>) -> AppResult<()> {
+fn run_schtasks<'a>(
+    operation: &'static str,
+    args: impl IntoIterator<Item = &'a str>,
+) -> AppResult<()> {
     let output = Command::new("schtasks.exe").args(args).output()?;
 
     if output.status.success() {
@@ -58,10 +67,21 @@ fn run_schtasks<'a>(args: impl IntoIterator<Item = &'a str>) -> AppResult<()> {
 
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
-
-    Err(format!(
+    let details = format!(
         "schtasks.exe failed with status {}. stdout: {} stderr: {}",
         output.status, stdout, stderr
-    )
-    .into())
+    );
+
+    if is_access_denied(&stdout) || is_access_denied(&stderr) {
+        return Err(StartupAccessDenied::new(operation, details).into());
+    }
+
+    Err(details.into())
+}
+
+fn is_access_denied(text: &str) -> bool {
+    let text = text.to_ascii_lowercase();
+    text.contains("access is denied")
+        || text.contains("access denied")
+        || text.contains("0x80070005")
 }

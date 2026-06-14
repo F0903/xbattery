@@ -1,18 +1,36 @@
 use std::io::{self, Write};
 
 use xbattery::{
-    AppResult, dialog,
-    startup::{StartupInstaller, StartupStatus},
+    AppResult, dialog, elevation,
+    startup::{StartupInstaller, StartupStatus, is_startup_access_denied},
 };
 
 pub(super) fn install_interactive() -> AppResult<()> {
     match install(true, false) {
         Ok(()) => Ok(()),
+        Err(error) if is_startup_access_denied(error.as_ref()) => retry_install_elevated(error),
         Err(error) => {
             dialog::show_error("xbattery", &format!("Install failed:\n\n{error}"));
             Err(error)
         }
     }
+}
+
+fn retry_install_elevated(error: Box<dyn std::error::Error + Send + Sync>) -> AppResult<()> {
+    match elevation::relaunch_current_exe_as_admin("install-elevated") {
+        Ok(()) => Ok(()),
+        Err(elevation_error) => {
+            let message = format!(
+                "Install failed:\n\n{error}\n\nCould not start elevated installer:\n\n{elevation_error}"
+            );
+            dialog::show_error("xbattery", &message);
+            Err(elevation_error)
+        }
+    }
+}
+
+pub(super) fn install_elevated_retry() -> AppResult<()> {
+    install(true, true)
 }
 
 pub(super) fn install(show_dialog: bool, force: bool) -> AppResult<()> {

@@ -26,6 +26,9 @@ enum Command {
         #[arg(short, long)]
         force: bool,
     },
+    /// Internal elevated install retry.
+    #[command(hide = true)]
+    InstallElevated,
     /// Remove per-user startup task; installed files are left in place.
     Uninstall,
     /// Print startup task and installed file status.
@@ -75,6 +78,7 @@ pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
     match cli.command {
         None => install::install_interactive(),
         Some(Command::Install { force }) => install::install(false, force),
+        Some(Command::InstallElevated) => install::install_elevated_retry(),
         Some(Command::Uninstall) => install::uninstall(false),
         Some(Command::Status) => install::status(),
         Some(Command::CheckUpdate) => update::check(),

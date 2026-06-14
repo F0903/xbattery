@@ -23,7 +23,9 @@ Download or build `xbattery.exe`, then run it.
 .\xbattery.exe
 ```
 
-Running the app with no command installs it for the current Windows user. It copies itself to:
+Running the app with no command installs it for the current Windows user. If Windows denies access while creating the startup task, xbattery retries through a UAC prompt.
+
+It copies itself to:
 
 ```text
 %LOCALAPPDATA%\Programs\xbattery
