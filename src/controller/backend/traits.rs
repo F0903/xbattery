@@ -24,6 +24,10 @@ pub trait BatteryBackend {
 
     fn battery_readings(&self) -> AppResult<Vec<BatteryReading>>;
 
+    fn settled_battery_readings(&self) -> AppResult<Vec<BatteryReading>> {
+        self.battery_readings()
+    }
+
     fn attach_to_many(&self, controllers: Vec<Controller>) -> Vec<Controller> {
         let Ok(readings) = self.battery_readings() else {
             return controllers;
@@ -42,7 +46,7 @@ pub trait BatteryBackend {
     }
 
     fn attach_to_one(&self, controller: Controller) -> Controller {
-        let Ok(readings) = self.battery_readings() else {
+        let Ok(readings) = self.settled_battery_readings() else {
             return controller;
         };
 

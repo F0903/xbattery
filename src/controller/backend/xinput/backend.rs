@@ -1,16 +1,19 @@
-use std::thread;
+use std::{thread, time::Duration};
 
 use crate::{
     AppResult,
     controller::{
         Controller, ControllerSource,
         backend::{BackendKind, BatteryBackend, InputBackend, RumbleBackend},
-        battery::BatteryReading,
+        battery::{BatteryCharge, BatteryLevel, BatteryReading},
         rumble::{RumbleStep, RumbleTarget},
     },
 };
 
 use super::{XInputDiagnosticReport, native, snapshot::ControllerSnapshot};
+
+const BATTERY_SETTLE_ATTEMPTS: usize = 5;
+const BATTERY_SETTLE_DELAY: Duration = Duration::from_millis(500);
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct XInputBackend;
@@ -54,6 +57,14 @@ impl XInputBackend {
             snapshot.battery,
         )
     }
+
+    fn battery_readings_once() -> AppResult<Vec<BatteryReading>> {
+        Ok(native::poll_controllers()?
+            .into_iter()
+            .flatten()
+            .map(|snapshot| snapshot.battery)
+            .collect())
+    }
 }
 
 impl InputBackend for XInputBackend {
@@ -72,11 +83,29 @@ impl BatteryBackend for XInputBackend {
     }
 
     fn battery_readings(&self) -> AppResult<Vec<BatteryReading>> {
-        Ok(native::poll_controllers()?
-            .into_iter()
-            .flatten()
-            .map(|snapshot| snapshot.battery)
-            .collect())
+        Self::battery_readings_once()
+    }
+
+    fn settled_battery_readings(&self) -> AppResult<Vec<BatteryReading>> {
+        let mut best_readings = Self::battery_readings_once()?;
+        if !should_wait_for_battery_to_settle(&best_readings) {
+            return Ok(best_readings);
+        }
+
+        for _ in 1..BATTERY_SETTLE_ATTEMPTS {
+            thread::sleep(BATTERY_SETTLE_DELAY);
+
+            let readings = Self::battery_readings_once()?;
+            if battery_reading_score(&readings) > battery_reading_score(&best_readings) {
+                best_readings = readings;
+            }
+
+            if !should_wait_for_battery_to_settle(&best_readings) {
+                break;
+            }
+        }
+
+        Ok(best_readings)
     }
 }
 
@@ -102,4 +131,25 @@ impl RumbleBackend for XInputBackend {
 
 fn motor_float_speed(value: f32) -> u16 {
     ((value.clamp(0.0, 1.0) * u16::MAX as f32).round()) as u16
+}
+
+fn should_wait_for_battery_to_settle(readings: &[BatteryReading]) -> bool {
+    matches!(
+        readings,
+        [BatteryReading {
+            charge: BatteryCharge::Coarse(BatteryLevel::Empty | BatteryLevel::Low),
+            ..
+        }]
+    )
+}
+
+fn battery_reading_score(readings: &[BatteryReading]) -> u8 {
+    match readings {
+        [reading] => match reading.charge {
+            BatteryCharge::Precise(percent) => percent,
+            BatteryCharge::Coarse(level) => level.estimated_percent(),
+            BatteryCharge::Unknown => 0,
+        },
+        _ => 0,
+    }
 }
