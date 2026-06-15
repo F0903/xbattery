@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use serde::Deserialize;
 
 use super::{
@@ -21,9 +23,25 @@ pub struct AppConfig {
     pub updates: UpdatesConfig,
 }
 
+#[derive(Clone, Debug)]
+pub struct LoadedAppConfig {
+    pub config: AppConfig,
+    pub path: Option<PathBuf>,
+}
+
+impl LoadedAppConfig {
+    pub(super) fn new(config: AppConfig, path: Option<PathBuf>) -> Self {
+        Self { config, path }
+    }
+}
+
 impl AppConfig {
     pub fn load() -> AppResult<Self> {
         loader::load()
+    }
+
+    pub fn load_with_source() -> AppResult<LoadedAppConfig> {
+        loader::load_with_source()
     }
 
     pub fn load_from_path(path: impl AsRef<std::path::Path>) -> AppResult<Self> {

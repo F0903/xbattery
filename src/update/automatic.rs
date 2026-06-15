@@ -1,6 +1,7 @@
 use std::{
     path::Path,
     process::Command,
+    sync::{Arc, RwLock},
     thread,
     time::{Duration, SystemTime},
 };
@@ -16,34 +17,68 @@ use crate::{
 };
 
 const STATE_FILE_NAME: &str = "update-state.toml";
-const MIN_CHECK_LOOP_INTERVAL: Duration = Duration::from_secs(60 * 30);
+const CHECK_LOOP_GRANULARITY: Duration = Duration::from_secs(60);
 
-pub fn start_background_checks(config: UpdatesConfig, notifier: ToastNotifier) -> AppResult<()> {
-    if !config.check_automatically {
-        return Ok(());
+#[derive(Clone, Debug)]
+pub struct AutomaticUpdateHandle {
+    config: Option<Arc<RwLock<UpdatesConfig>>>,
+}
+
+impl AutomaticUpdateHandle {
+    fn disabled() -> Self {
+        Self { config: None }
     }
 
+    pub fn update_config(&self, config: UpdatesConfig) -> AppResult<()> {
+        if let Some(current) = &self.config {
+            *current
+                .write()
+                .map_err(|_| "automatic update config lock is poisoned")? = config;
+        }
+
+        Ok(())
+    }
+}
+
+pub fn start_background_checks(
+    config: UpdatesConfig,
+    notifier: ToastNotifier,
+) -> AppResult<AutomaticUpdateHandle> {
     let installer = StartupInstaller::new()?;
     let installed_exe = installer.installed_exe().to_path_buf();
     if !installed_exe.exists() {
-        return Ok(());
+        return Ok(AutomaticUpdateHandle::disabled());
     }
 
     let state_path = installed_exe.with_file_name(STATE_FILE_NAME);
+    let config = Arc::new(RwLock::new(config));
+    let thread_config = Arc::clone(&config);
 
     thread::spawn(move || {
         let _ = init_com_for_thread();
 
         loop {
-            if let Err(error) = run_due_check(&config, &notifier, &installed_exe, &state_path) {
+            let config = match thread_config.read() {
+                Ok(config) => config.clone(),
+                Err(_) => {
+                    eprintln!("automatic update config lock is poisoned");
+                    break;
+                }
+            };
+
+            if config.check_automatically
+                && let Err(error) = run_due_check(&config, &notifier, &installed_exe, &state_path)
+            {
                 eprintln!("automatic update check failed: {error}");
             }
 
-            thread::sleep(config.check_interval().min(MIN_CHECK_LOOP_INTERVAL));
+            thread::sleep(config.check_interval().min(CHECK_LOOP_GRANULARITY));
         }
     });
 
-    Ok(())
+    Ok(AutomaticUpdateHandle {
+        config: Some(config),
+    })
 }
 
 fn run_due_check(

@@ -25,6 +25,10 @@ impl ControllerMonitor {
         }
     }
 
+    pub fn set_warning_policy(&mut self, warning_policy: BatteryWarningPolicy) {
+        self.warning_policy = warning_policy;
+    }
+
     pub fn observe_current(&mut self, current: Vec<Controller>) -> Vec<ControllerEvent> {
         let events = self.collect_events(&current);
         self.previous = current;

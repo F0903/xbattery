@@ -59,6 +59,8 @@ After install, edit:
 %LOCALAPPDATA%\Programs\xbattery\xbattery.toml
 ```
 
+The background monitor watches this file and applies valid changes automatically. If a save leaves the file invalid, xbattery keeps using the last valid config until the file is fixed.
+
 Common options:
 
 ```toml

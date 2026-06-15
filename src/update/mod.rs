@@ -9,7 +9,7 @@ use self_update::{
     update::{Release, ReleaseUpdate, UpdateStatus},
 };
 
-pub use automatic::start_background_checks;
+pub use automatic::{AutomaticUpdateHandle, start_background_checks};
 pub use report::{CheckUpdateReport, UpdateReport};
 
 use crate::{

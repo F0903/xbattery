@@ -3,24 +3,30 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::AppConfig;
+use super::{AppConfig, LoadedAppConfig};
 use crate::AppResult;
 
 const DEFAULT_CONFIG_FILE_NAME: &str = "xbattery.toml";
 const CONFIG_ENV_VAR: &str = "XBATTERY_CONFIG";
 
 pub(super) fn load() -> AppResult<AppConfig> {
+    Ok(load_with_source()?.config)
+}
+
+pub(super) fn load_with_source() -> AppResult<LoadedAppConfig> {
     if let Some(path) = env::var_os(CONFIG_ENV_VAR).map(PathBuf::from) {
-        return load_from_path(path);
+        let config = load_from_path(&path)?;
+        return Ok(LoadedAppConfig::new(config, Some(path)));
     }
 
     for path in default_config_paths()? {
         if path.exists() {
-            return load_from_path(path);
+            let config = load_from_path(&path)?;
+            return Ok(LoadedAppConfig::new(config, Some(path)));
         }
     }
 
-    Ok(AppConfig::default())
+    Ok(LoadedAppConfig::new(AppConfig::default(), None))
 }
 
 pub(super) fn load_from_path(path: impl AsRef<Path>) -> AppResult<AppConfig> {

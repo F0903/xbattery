@@ -115,6 +115,14 @@ where
     }
 
     pub fn run_until_ctrl_c_or(&mut self, should_stop: impl Fn() -> bool) -> AppResult<()> {
+        self.run_until_ctrl_c_or_reconfigure(should_stop, || Ok(None))
+    }
+
+    pub fn run_until_ctrl_c_or_reconfigure(
+        &mut self,
+        should_stop: impl Fn() -> bool,
+        mut next_config: impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
+    ) -> AppResult<()> {
         let running = Arc::new(AtomicBool::new(true));
         let running_signal = Arc::clone(&running);
 
@@ -125,16 +133,23 @@ where
         match self.input.start_event_stream() {
             Ok(stream) => {
                 if let Err(_event_error) =
-                    self.run_backend_event_loop(&running, &should_stop, stream)
+                    self.run_backend_event_loop(&running, &should_stop, stream, &mut next_config)
                     && active(&running, &should_stop)
                 {
-                    self.run_polling_loop(&running, &should_stop)?;
+                    self.run_polling_loop(&running, &should_stop, &mut next_config)?;
                 }
             }
-            Err(_start_error) => self.run_polling_loop(&running, &should_stop)?,
+            Err(_start_error) => self.run_polling_loop(&running, &should_stop, &mut next_config)?,
         }
 
         Ok(())
+    }
+
+    pub fn apply_config(&mut self, config: ControllerServiceConfig) {
+        self.monitor
+            .set_warning_policy(config.warning_policy.clone());
+        self.rumbler.set_config(config.rumble_config.clone());
+        self.config = config;
     }
 
     fn run_backend_event_loop(
@@ -142,8 +157,11 @@ where
         running: &AtomicBool,
         should_stop: &impl Fn() -> bool,
         stream: BackendEventStream,
+        next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
     ) -> AppResult<()> {
         while active(running, should_stop) {
+            self.apply_pending_config(next_config)?;
+
             match stream.recv_timeout(self.config.control_wait_slice) {
                 Ok(event) => self.process_backend_event(event)?,
                 Err(RecvTimeoutError::Timeout) => {}
@@ -160,26 +178,36 @@ where
         &mut self,
         running: &AtomicBool,
         should_stop: &impl Fn() -> bool,
+        next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
     ) -> AppResult<()> {
+        self.apply_pending_config(next_config)?;
         self.poll_and_notify()?;
 
         while active(running, should_stop) {
-            if !self.wait_for_next_poll(running, should_stop) {
+            if !self.wait_for_next_poll(running, should_stop, next_config)? {
                 break;
             }
 
+            self.apply_pending_config(next_config)?;
             self.poll_and_notify()?;
         }
 
         Ok(())
     }
 
-    fn wait_for_next_poll(&self, running: &AtomicBool, should_stop: &impl Fn() -> bool) -> bool {
+    fn wait_for_next_poll(
+        &mut self,
+        running: &AtomicBool,
+        should_stop: &impl Fn() -> bool,
+        next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
+    ) -> AppResult<bool> {
         let mut elapsed = Duration::ZERO;
 
         while elapsed < self.config.poll_interval {
+            self.apply_pending_config(next_config)?;
+
             if !active(running, should_stop) {
-                return false;
+                return Ok(false);
             }
 
             let remaining = self.config.poll_interval - elapsed;
@@ -188,7 +216,20 @@ where
             elapsed += sleep_for;
         }
 
-        active(running, should_stop)
+        self.apply_pending_config(next_config)?;
+
+        Ok(active(running, should_stop))
+    }
+
+    fn apply_pending_config(
+        &mut self,
+        next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
+    ) -> AppResult<()> {
+        if let Some(config) = next_config()? {
+            self.apply_config(config);
+        }
+
+        Ok(())
     }
 
     fn poll_and_notify(&mut self) -> AppResult<()> {

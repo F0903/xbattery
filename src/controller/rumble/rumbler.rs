@@ -31,6 +31,10 @@ where
         Self { config, backend }
     }
 
+    pub fn set_config(&mut self, config: ControllerRumbleConfig) {
+        self.config = config;
+    }
+
     pub fn rumble_for_event(&self, event: &ControllerEvent) {
         if !self.config.enabled {
             return;
