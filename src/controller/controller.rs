@@ -1,6 +1,6 @@
-use crate::battery::BatteryReading;
+use crate::controller::battery::BatteryReading;
 
-use super::backend::BackendKind;
+use super::{ControllerSource, backend::BackendKind};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Controller {
@@ -51,30 +51,5 @@ impl Controller {
         self.battery_source = source;
         self.battery = battery;
         self
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ControllerSource {
-    GameInput,
-    XInput,
-    WinRT,
-}
-
-impl ControllerSource {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::GameInput => "GameInput",
-            Self::XInput => "XInput",
-            Self::WinRT => "Windows.Gaming.Input",
-        }
-    }
-
-    fn backend_kind(self) -> BackendKind {
-        match self {
-            Self::GameInput => BackendKind::GameInput,
-            Self::XInput => BackendKind::XInput,
-            Self::WinRT => BackendKind::WinRT,
-        }
     }
 }

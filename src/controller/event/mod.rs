@@ -1,7 +1,7 @@
 mod notification_policy;
 
 use crate::{
-    battery::{BatteryCharge, BatteryKind, BatteryReading, BatteryWarning},
+    controller::battery::{BatteryCharge, BatteryKind, BatteryReading, BatteryWarning},
     notifier::Notification,
 };
 

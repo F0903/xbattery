@@ -8,17 +8,18 @@ use std::{
     time::Duration,
 };
 
-use crate::{AppResult, battery::BatteryWarningPolicy, notifier::Notifier};
+use crate::{AppResult, notifier::Notifier};
 
-use super::{
+use super::ControllerServiceConfig;
+use crate::controller::{
     backend::{
         BackendEvent, BackendEventStream, ControllerBattery, ControllerEventInput, ControllerInput,
         ControllerRumbler, GameInputBackend, XInputBackend,
     },
     battery_source::{attach_battery_readings, attach_single_battery_reading},
-    event::{ControllerEvent, ControllerNotificationPolicy},
+    event::ControllerEvent,
     monitor::ControllerMonitor,
-    rumble::{BatteryWarningRumbler, ControllerRumbleConfig},
+    rumble::BatteryWarningRumbler,
 };
 
 pub struct ControllerService<
@@ -33,45 +34,6 @@ pub struct ControllerService<
     notifier: N,
     rumbler: BatteryWarningRumbler<R>,
     config: ControllerServiceConfig,
-}
-
-#[derive(Clone, Debug)]
-pub struct ControllerServiceConfig {
-    poll_interval: Duration,
-    control_wait_slice: Duration,
-    warning_policy: BatteryWarningPolicy,
-    notification_policy: ControllerNotificationPolicy,
-    rumble_config: ControllerRumbleConfig,
-}
-
-impl ControllerServiceConfig {
-    pub fn new(
-        poll_interval: Duration,
-        control_wait_slice: Duration,
-        warning_policy: BatteryWarningPolicy,
-        notification_policy: ControllerNotificationPolicy,
-        rumble_config: ControllerRumbleConfig,
-    ) -> Self {
-        Self {
-            poll_interval,
-            control_wait_slice,
-            warning_policy,
-            notification_policy,
-            rumble_config,
-        }
-    }
-}
-
-impl Default for ControllerServiceConfig {
-    fn default() -> Self {
-        Self::new(
-            Duration::from_secs(60),
-            Duration::from_millis(250),
-            BatteryWarningPolicy::default(),
-            ControllerNotificationPolicy::default(),
-            ControllerRumbleConfig::default(),
-        )
-    }
 }
 
 impl<N: Notifier> ControllerService<N, GameInputBackend, XInputBackend, GameInputBackend> {
@@ -101,11 +63,11 @@ where
         rumbler: R,
     ) -> Self {
         Self {
-            monitor: ControllerMonitor::with_warning_policy(config.warning_policy.clone()),
+            monitor: ControllerMonitor::with_warning_policy(config.warning_policy().clone()),
             input,
             battery,
             notifier,
-            rumbler: BatteryWarningRumbler::with_backend(config.rumble_config.clone(), rumbler),
+            rumbler: BatteryWarningRumbler::with_backend(config.rumble_config().clone(), rumbler),
             config,
         }
     }
@@ -147,8 +109,8 @@ where
 
     pub fn apply_config(&mut self, config: ControllerServiceConfig) {
         self.monitor
-            .set_warning_policy(config.warning_policy.clone());
-        self.rumbler.set_config(config.rumble_config.clone());
+            .set_warning_policy(config.warning_policy().clone());
+        self.rumbler.set_config(config.rumble_config().clone());
         self.config = config;
     }
 
@@ -162,7 +124,7 @@ where
         while active(running, should_stop) {
             self.apply_pending_config(next_config)?;
 
-            match stream.recv_timeout(self.config.control_wait_slice) {
+            match stream.recv_timeout(self.config.control_wait_slice()) {
                 Ok(event) => self.process_backend_event(event)?,
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => {
@@ -203,15 +165,15 @@ where
     ) -> AppResult<bool> {
         let mut elapsed = Duration::ZERO;
 
-        while elapsed < self.config.poll_interval {
+        while elapsed < self.config.poll_interval() {
             self.apply_pending_config(next_config)?;
 
             if !active(running, should_stop) {
                 return Ok(false);
             }
 
-            let remaining = self.config.poll_interval - elapsed;
-            let sleep_for = remaining.min(self.config.control_wait_slice);
+            let remaining = self.config.poll_interval() - elapsed;
+            let sleep_for = remaining.min(self.config.control_wait_slice());
             thread::sleep(sleep_for);
             elapsed += sleep_for;
         }
@@ -251,7 +213,7 @@ where
         for event in events {
             self.rumbler.rumble_for_event(&event);
 
-            if let Some(notification) = event.notification(&self.config.notification_policy) {
+            if let Some(notification) = event.notification(self.config.notification_policy()) {
                 self.notifier.notify(&notification)?;
             }
         }

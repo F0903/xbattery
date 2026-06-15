@@ -1,7 +1,8 @@
 use std::thread;
 
-use crate::controller::backend::{
-    ControllerRumbler, GameInputBackend, RumbleBackend, RumbleTarget,
+use crate::controller::{
+    backend::{ControllerRumbler, GameInputBackend},
+    rumble::{RumbleBackend, RumbleTarget},
 };
 
 use super::{

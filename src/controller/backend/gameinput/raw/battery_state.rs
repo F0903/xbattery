@@ -1,4 +1,4 @@
-use crate::battery::{BatteryCharge, BatteryKind, BatteryReading};
+use crate::controller::battery::{BatteryCharge, BatteryKind, BatteryReading};
 
 pub(super) const GAMEINPUT_BATTERY_UNKNOWN: i32 = -1;
 pub(super) const GAMEINPUT_BATTERY_NOT_PRESENT: i32 = 0;

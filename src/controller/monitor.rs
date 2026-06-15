@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::{
+use crate::controller::{
     battery::{BatteryWarning, BatteryWarningPolicy},
-    controller::event::ControllerEvent,
+    event::ControllerEvent,
 };
 
 use super::Controller;
@@ -122,9 +122,10 @@ impl ControllerMonitor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use crate::controller::{
+        Controller, ControllerSource,
         battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading},
-        controller::{Controller, ControllerSource, event::ControllerEvent},
+        event::ControllerEvent,
     };
 
     use super::ControllerMonitor;
@@ -163,7 +164,7 @@ mod tests {
             events,
             vec![ControllerEvent::BatteryWarning {
                 current: medium,
-                warning: crate::battery::BatteryWarning::Coarse(BatteryLevel::Medium),
+                warning: crate::controller::battery::BatteryWarning::Coarse(BatteryLevel::Medium),
             }]
         );
     }

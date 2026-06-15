@@ -1,6 +1,6 @@
-use crate::{
+use crate::controller::{
+    Controller, ControllerSource,
     battery::{BatteryCharge, BatteryKind, BatteryReading, BatteryWarning},
-    controller::{Controller, ControllerSource},
 };
 
 use super::{
@@ -28,17 +28,19 @@ fn precise_warning_patterns_scale_by_threshold() {
 fn coarse_warning_patterns_scale_by_level() {
     assert_eq!(
         BatteryWarningStage::for_warning(BatteryWarning::Coarse(
-            crate::battery::BatteryLevel::Medium
+            crate::controller::battery::BatteryLevel::Medium
         )),
         Some(BatteryWarningStage::Medium)
     );
     assert_eq!(
-        BatteryWarningStage::for_warning(BatteryWarning::Coarse(crate::battery::BatteryLevel::Low)),
+        BatteryWarningStage::for_warning(BatteryWarning::Coarse(
+            crate::controller::battery::BatteryLevel::Low,
+        )),
         Some(BatteryWarningStage::Low)
     );
     assert_eq!(
         BatteryWarningStage::for_warning(BatteryWarning::Coarse(
-            crate::battery::BatteryLevel::Empty
+            crate::controller::battery::BatteryLevel::Empty
         )),
         Some(BatteryWarningStage::Empty)
     );

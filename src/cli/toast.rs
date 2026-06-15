@@ -2,11 +2,11 @@ use std::{thread, time::Duration};
 
 use xbattery::{
     AppResult,
-    battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning},
     config::AppConfig,
     controller::{
         Controller, ControllerSource,
         backend::BackendKind,
+        battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning},
         event::{ControllerEvent, ControllerNotificationPolicy},
     },
     notifier::{NotificationUrgency, Notifier, ToastNotifier},

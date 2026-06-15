@@ -1,5 +1,6 @@
-use crate::controller::backend::{
-    ControllerRumbler, GameInputBackend, RumbleBackend, RumbleTarget, XInputBackend,
+use crate::controller::{
+    backend::{ControllerRumbler, GameInputBackend, XInputBackend},
+    rumble::{RumbleBackend, RumbleTarget},
 };
 
 use super::{

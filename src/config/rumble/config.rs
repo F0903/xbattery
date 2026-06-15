@@ -7,6 +7,8 @@ use crate::{
     controller::rumble::{ControllerRumbleConfig, RumbleJolt, RumblePattern, RumblePatternSet},
 };
 
+use super::{RumbleJoltConfig, RumblePatternConfig, RumblePatternConfigSet};
+
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RumbleConfig {
@@ -15,29 +17,6 @@ pub struct RumbleConfig {
     pub group_gap_millis: u64,
     pub jolts: BTreeMap<String, RumbleJoltConfig>,
     pub patterns: RumblePatternConfigSet,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RumbleJoltConfig {
-    pub handle_strength_percent: u8,
-    pub trigger_strength_percent: u8,
-    pub handle_millis: u64,
-    pub trigger_millis: u64,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RumblePatternConfig {
-    pub groups: Vec<Vec<String>>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct RumblePatternConfigSet {
-    pub medium: Option<RumblePatternConfig>,
-    pub low: Option<RumblePatternConfig>,
-    pub empty: Option<RumblePatternConfig>,
 }
 
 impl RumbleConfig {
@@ -146,34 +125,6 @@ impl RumbleConfig {
     }
 }
 
-impl RumbleJoltConfig {
-    fn resolve(&self, name: &str) -> AppResult<RumbleJolt> {
-        validate_percent_field(
-            &format!("rumble.jolts.{name}.handle_strength_percent"),
-            self.handle_strength_percent,
-        )?;
-        validate_percent_field(
-            &format!("rumble.jolts.{name}.trigger_strength_percent"),
-            self.trigger_strength_percent,
-        )?;
-        validate_duration(
-            &format!("rumble.jolts.{name}.handle_millis"),
-            self.handle_millis,
-        )?;
-        validate_duration(
-            &format!("rumble.jolts.{name}.trigger_millis"),
-            self.trigger_millis,
-        )?;
-
-        Ok(RumbleJolt::new(
-            self.handle_strength_percent,
-            self.trigger_strength_percent,
-            Duration::from_millis(self.handle_millis),
-            Duration::from_millis(self.trigger_millis),
-        ))
-    }
-}
-
 impl Default for RumbleConfig {
     fn default() -> Self {
         Self {
@@ -183,21 +134,5 @@ impl Default for RumbleConfig {
             jolts: BTreeMap::new(),
             patterns: RumblePatternConfigSet::default(),
         }
-    }
-}
-
-fn validate_percent_field(field: &str, value: u8) -> AppResult<()> {
-    if value > 100 {
-        Err(format!("{field} must be between 0 and 100").into())
-    } else {
-        Ok(())
-    }
-}
-
-fn validate_duration(field: &str, value: u64) -> AppResult<()> {
-    if value == 0 {
-        Err(format!("{field} must be greater than zero").into())
-    } else {
-        Ok(())
     }
 }

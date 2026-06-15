@@ -11,21 +11,10 @@ use windows::Win32::{
 
 use crate::{
     AppResult,
-    battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading},
+    controller::battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading},
 };
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ControllerSnapshot {
-    pub slot: u32,
-    pub packet_number: u32,
-    pub battery: BatteryReading,
-}
-
-impl ControllerSnapshot {
-    pub fn name(self) -> String {
-        format!("Controller {}", self.slot + 1)
-    }
-}
+use super::snapshot::ControllerSnapshot;
 
 pub fn poll_controllers() -> AppResult<[Option<ControllerSnapshot>; XUSER_MAX_COUNT as usize]> {
     let mut snapshots = [None; XUSER_MAX_COUNT as usize];

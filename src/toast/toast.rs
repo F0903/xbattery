@@ -7,30 +7,7 @@ use windows::{
 
 use crate::{AppResult, notifier::NotificationUrgency};
 
-const DEFAULT_APP_ID: &str = "xbattery";
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ToastConfig {
-    app_id: String,
-}
-
-impl ToastConfig {
-    pub fn new(app_id: impl Into<String>) -> Self {
-        Self {
-            app_id: app_id.into(),
-        }
-    }
-
-    pub fn app_id(&self) -> &str {
-        &self.app_id
-    }
-}
-
-impl Default for ToastConfig {
-    fn default() -> Self {
-        Self::new(DEFAULT_APP_ID)
-    }
-}
+use super::ToastConfig;
 
 pub struct Toast {
     config: ToastConfig,
@@ -112,18 +89,5 @@ impl Toast {
         }
 
         Ok(ToastNotification::CreateToastNotification(&toast_xml)?)
-    }
-}
-
-impl NotificationUrgency {
-    fn uses_high_priority(self) -> bool {
-        matches!(self, Self::High | Self::Urgent)
-    }
-
-    fn toast_scenario(self) -> Option<&'static str> {
-        match self {
-            Self::Urgent => Some("urgent"),
-            Self::Normal | Self::High => None,
-        }
     }
 }

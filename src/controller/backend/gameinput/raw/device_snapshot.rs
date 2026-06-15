@@ -1,4 +1,4 @@
-use crate::battery::BatteryReading;
+use crate::controller::battery::BatteryReading;
 
 use super::{
     GameInputBatteryState, battery_state::battery_status_description,

@@ -1,12 +1,13 @@
-use std::{env, fs, path::Path, process::Command};
+use std::{env, fs, path::Path, process::Command, time::Duration};
 
 use super::{
     InstallReport, StartupStatus, UninstallReport, paths::StartupPaths,
-    scheduled_task::ScheduledTask,
+    process::terminate_processes_for_exe, scheduled_task::ScheduledTask,
 };
-use crate::AppResult;
+use crate::{AppResult, monitor_control::stop_monitor};
 
 const DEFAULT_CONFIG: &str = include_str!("../../xbattery.toml");
+const EXISTING_MONITOR_STOP_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug)]
 pub struct StartupInstaller {
@@ -30,6 +31,10 @@ impl StartupInstaller {
                 status.summary()
             )
             .into());
+        }
+
+        if overwrite && status.installed_exe_exists {
+            self.stop_existing_install()?;
         }
 
         fs::create_dir_all(&self.paths.install_dir)?;
@@ -86,6 +91,12 @@ impl StartupInstaller {
         }
 
         command.spawn()?;
+        Ok(())
+    }
+
+    fn stop_existing_install(&self) -> AppResult<()> {
+        let _ = stop_monitor(EXISTING_MONITOR_STOP_TIMEOUT)?;
+        terminate_processes_for_exe(&self.paths.installed_exe)?;
         Ok(())
     }
 

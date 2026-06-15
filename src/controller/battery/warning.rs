@@ -1,4 +1,4 @@
-use crate::battery::{BatteryCharge, BatteryLevel, BatteryReading};
+use crate::controller::battery::{BatteryCharge, BatteryLevel, BatteryReading};
 
 const DEFAULT_PRECISE_THRESHOLDS: [u8; 3] = [50, 25, 10];
 
@@ -66,7 +66,7 @@ impl Default for BatteryWarningPolicy {
 
 #[cfg(test)]
 mod tests {
-    use crate::battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading};
+    use crate::controller::battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading};
 
     use super::{BatteryWarning, BatteryWarningPolicy};
 

@@ -1,5 +1,5 @@
 use crate::{
-    battery::{BatteryLevel, BatteryWarning},
+    controller::battery::{BatteryLevel, BatteryWarning},
     controller::event::ControllerEvent,
 };
 

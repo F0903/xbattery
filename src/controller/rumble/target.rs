@@ -31,9 +31,9 @@ fn parse_xinput_slot(id: &str) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
+    use crate::controller::{
+        Controller, ControllerSource,
         battery::{BatteryCharge, BatteryKind, BatteryReading},
-        controller::{Controller, ControllerSource},
     };
 
     use super::RumbleTarget;

@@ -1,6 +1,7 @@
-use crate::rumble::RumbleStep;
-
-use super::config::{ControllerRumbleConfig, RumbleJolt, RumblePattern};
+use super::{
+    RumbleStep,
+    config::{ControllerRumbleConfig, RumbleJolt, RumblePattern},
+};
 
 pub(super) fn rumble_sequence(
     pattern: &RumblePattern,

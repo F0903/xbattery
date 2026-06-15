@@ -1,6 +1,7 @@
 mod error;
 mod installer;
 mod paths;
+mod process;
 mod report;
 mod scheduled_task;
 mod status;

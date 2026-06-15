@@ -1,6 +1,8 @@
 use crate::{
-    battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning},
-    controller::{Controller, ControllerSource},
+    controller::{
+        Controller, ControllerSource,
+        battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning},
+    },
     notifier::NotificationUrgency,
 };
 
@@ -60,7 +62,7 @@ fn disconnected_notifications_use_user_facing_copy() {
     assert_eq!(notification.title(), "Xbox Controller Disconnected");
     assert_eq!(
         notification.body(),
-        "Controller has been disconnected. Last known battery level was ~25%"
+        "Controller has been disconnected. Last known battery level was ~40%"
     );
     assert!(!notification.body().contains("XInput"));
 }
@@ -139,7 +141,7 @@ fn coarse_battery_notifications_use_user_facing_copy() {
         .unwrap();
 
     assert_eq!(notification.title(), "Xbox Controller Battery Status");
-    assert_eq!(notification.body(), "Battery level is ~50%");
+    assert_eq!(notification.body(), "Battery level is ~70%");
     assert!(!notification.body().contains("XInput"));
 }
 

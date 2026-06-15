@@ -2,89 +2,9 @@ use std::thread;
 
 use windows::Gaming::Input::{Gamepad, GamepadVibration, RawGameController};
 
-use crate::{
-    AppResult,
-    battery::{BatteryCharge, BatteryKind, BatteryReading},
-    rumble::RumbleStep,
-};
+use crate::{AppResult, controller::rumble::RumbleStep};
 
-#[derive(Debug)]
-pub struct GamepadReport {
-    pub index: u32,
-    pub is_wireless: bool,
-    pub remaining_mwh: Option<i32>,
-    pub full_charge_mwh: Option<i32>,
-    pub percent: Option<u8>,
-}
-
-impl GamepadReport {
-    pub fn description(&self) -> String {
-        let percent = self
-            .percent
-            .map(|value| format!("{}%", value))
-            .unwrap_or_else(|| "unknown percent".to_string());
-
-        format!(
-            "Gamepad {} ({}, {})",
-            self.index + 1,
-            if self.is_wireless {
-                "wireless"
-            } else {
-                "wired"
-            },
-            percent
-        )
-    }
-}
-
-#[derive(Debug)]
-pub struct RawControllerReport {
-    pub id: String,
-    pub display_name: String,
-    pub vendor_id: u16,
-    pub product_id: u16,
-    pub is_wireless: bool,
-    pub remaining_mwh: Option<i32>,
-    pub full_charge_mwh: Option<i32>,
-    pub percent: Option<u8>,
-}
-
-impl RawControllerReport {
-    pub fn battery(&self) -> BatteryReading {
-        let kind = if self.is_wireless {
-            BatteryKind::Unknown
-        } else {
-            BatteryKind::Wired
-        };
-
-        BatteryReading::new(
-            kind,
-            self.percent
-                .map(BatteryCharge::Precise)
-                .unwrap_or(BatteryCharge::Unknown),
-        )
-    }
-
-    pub fn description(&self) -> String {
-        let percent = self
-            .percent
-            .map(|value| format!("{}%", value))
-            .unwrap_or_else(|| "unknown percent".to_string());
-
-        format!(
-            "{} (vid {:04x}, pid {:04x}, {}, {})",
-            self.display_name,
-            self.vendor_id,
-            self.product_id,
-            if self.is_wireless {
-                "wireless"
-            } else {
-                "wired"
-            },
-            percent
-        )
-    }
-}
+use super::{GamepadReport, RawControllerReport};
 
 pub fn raw_controller_reports() -> AppResult<Vec<RawControllerReport>> {
     let controllers = RawGameController::RawGameControllers()?;

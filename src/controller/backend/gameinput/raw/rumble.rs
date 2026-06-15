@@ -1,4 +1,4 @@
-use crate::{AppResult, rumble::RumbleStep};
+use crate::{AppResult, controller::rumble::RumbleStep};
 
 use super::ffi;
 

@@ -8,8 +8,10 @@ use super::{
 };
 use crate::{
     AppResult,
-    battery::BatteryWarningPolicy,
-    controller::{event::ControllerNotificationPolicy, service::ControllerServiceConfig},
+    controller::{
+        battery::BatteryWarningPolicy, event::ControllerNotificationPolicy,
+        service::ControllerServiceConfig,
+    },
     toast::ToastConfig,
 };
 

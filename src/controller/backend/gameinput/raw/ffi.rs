@@ -13,7 +13,7 @@ use super::{
         GAMEINPUT_INVALID_CALLBACK_TOKEN_VALUE, GAMEINPUT_KIND_GAMEPAD, IID_IGAMEINPUT_V0,
     },
 };
-use crate::rumble::RumbleStep;
+use crate::controller::rumble::RumbleStep;
 
 #[repr(C)]
 struct IGameInput {

@@ -1,6 +1,13 @@
-use crate::{AppResult, battery::BatteryReading, controller::Controller, rumble::RumbleStep};
+use crate::{
+    AppResult,
+    controller::{
+        Controller,
+        battery::BatteryReading,
+        rumble::{RumbleBackend, RumbleStep, RumbleTarget},
+    },
+};
 
-use super::{BackendEvent, BackendEventStream, BackendKind, RumbleBackend, RumbleTarget};
+use super::{BackendEvent, BackendEventStream, BackendKind};
 
 pub trait ControllerInput {
     fn poll_controllers(&self) -> AppResult<Vec<Controller>>;
