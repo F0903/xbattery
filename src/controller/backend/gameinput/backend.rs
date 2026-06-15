@@ -3,10 +3,10 @@ use crate::{
     controller::{
         Controller, ControllerSource,
         backend::{
-            BackendEvent, BackendEventStream, ControllerEventInput, ControllerInput,
-            ControllerRumbler,
+            BackendEvent, BackendEventStream, BackendKind, EventBackend, InputBackend,
+            RumbleBackend,
         },
-        rumble::{RumbleBackend, RumbleStep, RumbleTarget},
+        rumble::{RumbleStep, RumbleTarget},
     },
 };
 
@@ -43,7 +43,7 @@ impl GameInputBackend {
     }
 }
 
-impl ControllerEventInput for GameInputBackend {
+impl EventBackend for GameInputBackend {
     fn start_event_stream(&self) -> AppResult<BackendEventStream> {
         let (watcher, receiver) = raw::start_callback_watcher()?;
         Ok(BackendEventStream::gameinput(watcher, receiver))
@@ -61,7 +61,7 @@ impl ControllerEventInput for GameInputBackend {
     }
 }
 
-impl ControllerInput for GameInputBackend {
+impl InputBackend for GameInputBackend {
     fn poll_controllers(&self) -> AppResult<Vec<Controller>> {
         Ok(raw::enumerate_gamepad_snapshots()?
             .into_iter()
@@ -71,14 +71,14 @@ impl ControllerInput for GameInputBackend {
     }
 }
 
-impl ControllerRumbler for GameInputBackend {
+impl RumbleBackend for GameInputBackend {
     fn rumble(
         &self,
         _target: RumbleTarget,
         steps: &[RumbleStep],
-    ) -> AppResult<Option<RumbleBackend>> {
+    ) -> AppResult<Option<BackendKind>> {
         if raw::play_rumble_on_single_gamepad(steps)? {
-            Ok(Some(RumbleBackend::GameInput))
+            Ok(Some(BackendKind::GameInput))
         } else {
             Ok(None)
         }

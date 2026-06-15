@@ -1,12 +1,6 @@
-use crate::controller::battery::{BatteryCharge, BatteryLevel, BatteryReading};
+use crate::controller::battery::{BatteryCharge, BatteryLevel, BatteryReading, BatteryWarning};
 
 const DEFAULT_PRECISE_THRESHOLDS: [u8; 3] = [50, 25, 10];
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum BatteryWarning {
-    Precise(u8),
-    Coarse(BatteryLevel),
-}
 
 #[derive(Clone, Debug)]
 pub struct BatteryWarningPolicy {

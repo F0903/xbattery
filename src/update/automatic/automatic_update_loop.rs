@@ -1,5 +1,6 @@
 use std::{
     path::{Path, PathBuf},
+    process::Command,
     sync::{Arc, RwLock},
     thread,
     time::{Duration, SystemTime},
@@ -18,7 +19,6 @@ use crate::{
 use super::{
     automatic_update_handle::AutomaticUpdateHandle,
     notify::{notify_auto_update_started, notify_update_available},
-    update_process::spawn_update_process,
 };
 
 const STATE_FILE_NAME: &str = "update-state.toml";
@@ -96,6 +96,21 @@ impl AutomaticUpdateLoop {
             &self.state_path,
         )
     }
+}
+
+fn spawn_update_process(installed_exe: &Path) -> AppResult<()> {
+    let mut command = Command::new(installed_exe);
+    command.arg("update");
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    command.spawn()?;
+    Ok(())
 }
 
 fn run_due_check(

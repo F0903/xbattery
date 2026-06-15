@@ -2,9 +2,9 @@ use crate::{
     AppResult,
     controller::{
         Controller, ControllerSource,
-        backend::{BackendKind, ControllerBattery, ControllerInput, ControllerRumbler},
+        backend::{BackendKind, BatteryBackend, InputBackend, RumbleBackend},
         battery::BatteryReading,
-        rumble::{RumbleBackend, RumbleStep, RumbleTarget},
+        rumble::{RumbleStep, RumbleTarget},
     },
 };
 
@@ -38,7 +38,7 @@ impl WinRTBackend {
     }
 }
 
-impl ControllerInput for WinRTBackend {
+impl InputBackend for WinRTBackend {
     fn poll_controllers(&self) -> AppResult<Vec<Controller>> {
         Ok(windows_gaming_input::raw_controller_reports()?
             .into_iter()
@@ -48,7 +48,7 @@ impl ControllerInput for WinRTBackend {
     }
 }
 
-impl ControllerBattery for WinRTBackend {
+impl BatteryBackend for WinRTBackend {
     fn backend_kind(&self) -> BackendKind {
         BackendKind::WinRT
     }
@@ -62,14 +62,14 @@ impl ControllerBattery for WinRTBackend {
     }
 }
 
-impl ControllerRumbler for WinRTBackend {
+impl RumbleBackend for WinRTBackend {
     fn rumble(
         &self,
         _target: RumbleTarget,
         steps: &[RumbleStep],
-    ) -> AppResult<Option<RumbleBackend>> {
+    ) -> AppResult<Option<BackendKind>> {
         if windows_gaming_input::play_rumble_on_single_gamepad(steps)? {
-            Ok(Some(RumbleBackend::WinRT))
+            Ok(Some(BackendKind::WinRT))
         } else {
             Ok(None)
         }

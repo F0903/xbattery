@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 
 use super::{
-    BatteryConfig, MonitorConfig, NotificationsConfig, RumbleConfig, UpdatesConfig, loader,
+    BatteryConfig, MonitorConfig, NotificationsConfig, RumbleConfig, UpdatesConfig, load,
     validation,
 };
 use crate::{
@@ -39,15 +39,15 @@ impl LoadedAppConfig {
 
 impl AppConfig {
     pub fn load() -> AppResult<Self> {
-        loader::load()
+        load::load()
     }
 
     pub fn load_with_source() -> AppResult<LoadedAppConfig> {
-        loader::load_with_source()
+        load::load_with_source()
     }
 
     pub fn load_from_path(path: impl AsRef<std::path::Path>) -> AppResult<Self> {
-        loader::load_from_path(path)
+        load::load_from_path(path)
     }
 
     pub fn controller_service_config(&self) -> AppResult<ControllerServiceConfig> {

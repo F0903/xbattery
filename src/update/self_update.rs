@@ -8,7 +8,10 @@ use self_update::{
 use crate::{
     AppResult,
     config::UpdatesConfig,
-    monitor_control::{MonitorStopResult, stop_monitor},
+    ipc::{
+        BACKGROUND_INSTANCE_MUTEX_NAME, BACKGROUND_INSTANCE_STOP_EVENT_NAME, StopResult,
+        request_stop,
+    },
     startup::StartupInstaller,
 };
 
@@ -44,22 +47,26 @@ pub fn update(config: &UpdatesConfig, dry_run: bool) -> AppResult<UpdateReport> 
         return Ok(UpdateReport::dry_run(current_version(), release.version));
     }
 
-    let stop_result = stop_monitor(MONITOR_STOP_TIMEOUT)?;
-    if stop_result == MonitorStopResult::TimedOut {
+    let stop_result = request_stop(
+        BACKGROUND_INSTANCE_MUTEX_NAME,
+        BACKGROUND_INSTANCE_STOP_EVENT_NAME,
+        MONITOR_STOP_TIMEOUT,
+    )?;
+    if stop_result == StopResult::TimedOut {
         return Err("timed out waiting for xbattery monitor to stop".into());
     }
 
     let update_result = run_update(config, installed_exe);
     match update_result {
         Ok(report) => {
-            if stop_result == MonitorStopResult::Stopped {
+            if stop_result == StopResult::Stopped {
                 installer.start_monitor()?;
             }
 
-            Ok(report.with_monitor_stop_result(stop_result))
+            Ok(report.with_stop_result(stop_result))
         }
         Err(error) => {
-            if stop_result == MonitorStopResult::Stopped {
+            if stop_result == StopResult::Stopped {
                 let _ = installer.start_monitor();
             }
 

@@ -10,7 +10,7 @@ pub(super) fn test() -> AppResult<()> {
 
     println!(
         "Sent the critical battery rumble pattern with {}.",
-        backend.description()
+        backend.label()
     );
     Ok(())
 }
@@ -35,7 +35,7 @@ pub(super) fn test_thresholds() -> AppResult<()> {
             description
         );
         let backend = rumble::rumble_single_controller(rumble_config.clone(), *warning_level)?;
-        println!("    backend: {}", backend.description());
+        println!("    backend: {}", backend.label());
 
         if index + 1 < patterns.len() {
             thread::sleep(BETWEEN_PATTERNS);

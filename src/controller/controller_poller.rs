@@ -2,8 +2,7 @@ use crate::AppResult;
 
 use super::{
     Controller,
-    backend::{ControllerBattery, ControllerInput, GameInputBackend, XInputBackend},
-    battery_source::attach_battery_readings,
+    backend::{BatteryBackend, GameInputBackend, InputBackend, XInputBackend},
 };
 
 #[derive(Clone, Debug)]
@@ -20,8 +19,8 @@ impl ControllerPoller<GameInputBackend, XInputBackend> {
 
 impl<I, B> ControllerPoller<I, B>
 where
-    I: ControllerInput,
-    B: ControllerBattery,
+    I: InputBackend,
+    B: BatteryBackend,
 {
     pub fn with_providers(input: I, battery: B) -> Self {
         Self { input, battery }
@@ -29,7 +28,7 @@ where
 
     pub fn poll(&self) -> AppResult<Vec<Controller>> {
         let controllers = self.input.poll_controllers()?;
-        Ok(attach_battery_readings(controllers, &self.battery))
+        Ok(self.battery.attach_to_many(controllers))
     }
 }
 

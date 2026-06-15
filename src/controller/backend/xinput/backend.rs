@@ -4,9 +4,9 @@ use crate::{
     AppResult,
     controller::{
         Controller, ControllerSource,
-        backend::{BackendKind, ControllerBattery, ControllerInput, ControllerRumbler},
+        backend::{BackendKind, BatteryBackend, InputBackend, RumbleBackend},
         battery::BatteryReading,
-        rumble::{RumbleBackend, RumbleStep, RumbleTarget},
+        rumble::{RumbleStep, RumbleTarget},
     },
 };
 
@@ -56,7 +56,7 @@ impl XInputBackend {
     }
 }
 
-impl ControllerInput for XInputBackend {
+impl InputBackend for XInputBackend {
     fn poll_controllers(&self) -> AppResult<Vec<Controller>> {
         Ok(native::poll_controllers()?
             .into_iter()
@@ -66,7 +66,7 @@ impl ControllerInput for XInputBackend {
     }
 }
 
-impl ControllerBattery for XInputBackend {
+impl BatteryBackend for XInputBackend {
     fn backend_kind(&self) -> BackendKind {
         BackendKind::XInput
     }
@@ -80,12 +80,8 @@ impl ControllerBattery for XInputBackend {
     }
 }
 
-impl ControllerRumbler for XInputBackend {
-    fn rumble(
-        &self,
-        target: RumbleTarget,
-        steps: &[RumbleStep],
-    ) -> AppResult<Option<RumbleBackend>> {
+impl RumbleBackend for XInputBackend {
+    fn rumble(&self, target: RumbleTarget, steps: &[RumbleStep]) -> AppResult<Option<BackendKind>> {
         let Some(slot) = self.target_slot(target)? else {
             return Ok(None);
         };
@@ -100,7 +96,7 @@ impl ControllerRumbler for XInputBackend {
             native::stop_vibration(slot)?;
         }
 
-        Ok(Some(RumbleBackend::XInput(slot)))
+        Ok(Some(BackendKind::XInput))
     }
 }
 

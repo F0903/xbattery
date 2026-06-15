@@ -1,9 +1,9 @@
 pub mod config;
 pub mod controller;
 pub mod dialog;
-pub mod elevation;
+pub mod elevate;
+pub mod ipc;
 pub mod launch_context;
-pub mod monitor_control;
 pub mod notifier;
 pub mod single_instance;
 pub mod startup;

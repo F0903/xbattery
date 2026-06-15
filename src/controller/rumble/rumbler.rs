@@ -1,15 +1,12 @@
 use std::thread;
 
 use crate::controller::{
-    backend::{ControllerRumbler, GameInputBackend},
-    rumble::{RumbleBackend, RumbleTarget},
+    backend::{BackendKind, GameInputBackend, RumbleBackend},
+    battery::BatteryWarningStage,
+    rumble::RumbleTarget,
 };
 
-use super::{
-    config::{ControllerRumbleConfig, RumblePattern},
-    pattern::BatteryWarningStage,
-    sequence::rumble_sequence,
-};
+use super::config::ControllerRumbleConfig;
 use crate::controller::event::ControllerEvent;
 
 #[derive(Clone, Debug)]
@@ -26,7 +23,7 @@ impl BatteryWarningRumbler<GameInputBackend> {
 
 impl<R> BatteryWarningRumbler<R>
 where
-    R: ControllerRumbler + Clone + Send + 'static,
+    R: RumbleBackend + Clone + Send + 'static,
 {
     pub fn with_backend(config: ControllerRumbleConfig, backend: R) -> Self {
         Self { config, backend }
@@ -41,7 +38,7 @@ where
             return;
         }
 
-        let Some(stage) = BatteryWarningStage::for_event(event) else {
+        let Some(stage) = event.battery_warning_stage() else {
             return;
         };
 
@@ -56,21 +53,10 @@ where
 }
 
 pub(super) fn run_stage(
-    backend: &impl ControllerRumbler,
+    backend: &impl RumbleBackend,
     target: RumbleTarget,
     stage: BatteryWarningStage,
     config: &ControllerRumbleConfig,
-) -> crate::AppResult<Option<RumbleBackend>> {
-    let pattern = config.pattern_for_stage(stage);
-    run_pattern(backend, target, pattern, config)
-}
-
-pub(super) fn run_pattern(
-    backend: &impl ControllerRumbler,
-    target: RumbleTarget,
-    pattern: &RumblePattern,
-    config: &ControllerRumbleConfig,
-) -> crate::AppResult<Option<RumbleBackend>> {
-    let sequence = rumble_sequence(pattern, config);
-    backend.rumble(target, &sequence)
+) -> crate::AppResult<Option<BackendKind>> {
+    backend.rumble(target, &config.steps_for_stage(stage))
 }

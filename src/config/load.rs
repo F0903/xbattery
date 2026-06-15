@@ -9,6 +9,21 @@ use crate::AppResult;
 const DEFAULT_CONFIG_FILE_NAME: &str = "xbattery.toml";
 const CONFIG_ENV_VAR: &str = "XBATTERY_CONFIG";
 
+fn default_config_paths() -> AppResult<Vec<PathBuf>> {
+    let mut paths = vec![env::current_dir()?.join(DEFAULT_CONFIG_FILE_NAME)];
+
+    if let Ok(exe_path) = env::current_exe()
+        && let Some(exe_dir) = exe_path.parent()
+    {
+        let exe_config = exe_dir.join(DEFAULT_CONFIG_FILE_NAME);
+        if !paths.iter().any(|path| path == &exe_config) {
+            paths.push(exe_config);
+        }
+    }
+
+    Ok(paths)
+}
+
 pub(super) fn load() -> AppResult<AppConfig> {
     Ok(load_with_source()?.config)
 }
@@ -38,19 +53,4 @@ pub(super) fn load_from_path(path: impl AsRef<Path>) -> AppResult<AppConfig> {
 
     config.validate()?;
     Ok(config)
-}
-
-fn default_config_paths() -> AppResult<Vec<PathBuf>> {
-    let mut paths = vec![env::current_dir()?.join(DEFAULT_CONFIG_FILE_NAME)];
-
-    if let Ok(exe_path) = env::current_exe()
-        && let Some(exe_dir) = exe_path.parent()
-    {
-        let exe_config = exe_dir.join(DEFAULT_CONFIG_FILE_NAME);
-        if !paths.iter().any(|path| path == &exe_config) {
-            paths.push(exe_config);
-        }
-    }
-
-    Ok(paths)
 }

@@ -8,15 +8,13 @@ use windows::{
 
 use crate::AppResult;
 
-use super::MONITOR_STOP_EVENT_NAME;
-
-pub struct MonitorStopEvent {
+pub struct NamedEvent {
     handle: HANDLE,
 }
 
-impl MonitorStopEvent {
-    pub fn open_or_create() -> AppResult<Self> {
-        let name = HSTRING::from(MONITOR_STOP_EVENT_NAME);
+impl NamedEvent {
+    pub fn open_or_create(name: &str) -> AppResult<Self> {
+        let name = HSTRING::from(name);
         let handle = unsafe { CreateEventW(None, true, false, &name)? };
 
         Ok(Self { handle })
@@ -43,7 +41,7 @@ impl MonitorStopEvent {
     }
 }
 
-impl Drop for MonitorStopEvent {
+impl Drop for NamedEvent {
     fn drop(&mut self) {
         unsafe {
             let _ = CloseHandle(self.handle);

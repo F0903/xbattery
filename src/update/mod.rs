@@ -1,8 +1,8 @@
 mod automatic;
 mod report;
+mod self_update;
 mod state;
-mod updater;
 
 pub use automatic::{AutomaticUpdateHandle, start_background_checks};
 pub use report::{CheckUpdateReport, UpdateReport};
-pub use updater::{check, update};
+pub use self_update::{check, update};

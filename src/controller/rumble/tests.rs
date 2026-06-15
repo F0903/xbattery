@@ -1,12 +1,9 @@
 use crate::controller::{
     Controller, ControllerSource,
-    battery::{BatteryCharge, BatteryKind, BatteryReading, BatteryWarning},
+    battery::{BatteryCharge, BatteryKind, BatteryReading, BatteryWarning, BatteryWarningStage},
 };
 
-use super::{
-    BatteryWarningRumbler, BatteryWarningStage, ControllerRumbleConfig,
-    sequence::{motor_speed, rumble_sequence},
-};
+use super::{BatteryWarningRumbler, ControllerRumbleConfig, config::motor_speed};
 
 #[test]
 fn precise_warning_patterns_scale_by_threshold() {
@@ -50,7 +47,7 @@ fn coarse_warning_patterns_scale_by_level() {
 fn ignores_connectivity_events() {
     let event = crate::controller::event::ControllerEvent::Connected(controller());
 
-    assert_eq!(BatteryWarningStage::for_event(&event), None);
+    assert_eq!(event.battery_warning_stage(), None);
 }
 
 #[test]
@@ -63,15 +60,9 @@ fn motor_strength_is_clamped_to_percent() {
 fn gradient_patterns_have_expected_shape() {
     let config = ControllerRumbleConfig::default();
 
-    let medium = rumble_sequence(
-        config.pattern_for_stage(BatteryWarningStage::Medium),
-        &config,
-    );
-    let low = rumble_sequence(config.pattern_for_stage(BatteryWarningStage::Low), &config);
-    let empty = rumble_sequence(
-        config.pattern_for_stage(BatteryWarningStage::Empty),
-        &config,
-    );
+    let medium = config.steps_for_stage(BatteryWarningStage::Medium);
+    let low = config.steps_for_stage(BatteryWarningStage::Low);
+    let empty = config.steps_for_stage(BatteryWarningStage::Empty);
 
     assert_eq!(medium.len(), 5);
     assert_eq!(low.len(), 8);

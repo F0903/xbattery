@@ -3,8 +3,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::{CONFIG_NAME, EXE_NAME};
 use crate::AppResult;
+
+const EXE_NAME: &str = "xbattery.exe";
+const CONFIG_NAME: &str = "xbattery.toml";
 
 #[derive(Clone, Debug)]
 pub(super) struct StartupPaths {

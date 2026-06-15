@@ -2,19 +2,19 @@ use xbattery::{
     AppResult,
     config::{self, AppConfig},
     controller::service::ControllerService,
-    monitor_control::{MONITOR_MUTEX_NAME, MonitorStopEvent},
+    ipc::{BACKGROUND_INSTANCE_MUTEX_NAME, BACKGROUND_INSTANCE_STOP_EVENT_NAME, NamedEvent},
     notifier::ToastNotifier,
     single_instance::SingleInstance,
     update,
 };
 
 pub(super) fn run() -> AppResult<()> {
-    let Some(_guard) = SingleInstance::acquire(MONITOR_MUTEX_NAME)? else {
+    let Some(_guard) = SingleInstance::acquire(BACKGROUND_INSTANCE_MUTEX_NAME)? else {
         println!("xbattery monitor is already running.");
         return Ok(());
     };
 
-    let stop_event = MonitorStopEvent::open_or_create()?;
+    let stop_event = NamedEvent::open_or_create(BACKGROUND_INSTANCE_STOP_EVENT_NAME)?;
     stop_event.reset()?;
 
     let loaded_config = AppConfig::load_with_source()?;

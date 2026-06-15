@@ -1,4 +1,4 @@
-use crate::controller::rumble::BatteryWarningStage;
+use crate::controller::battery::BatteryWarningStage;
 
 use super::AppConfig;
 

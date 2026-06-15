@@ -1,5 +1,5 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum MonitorStopResult {
+pub enum StopResult {
     NotRunning,
     Stopped,
     TimedOut,

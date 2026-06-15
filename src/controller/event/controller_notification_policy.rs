@@ -31,15 +31,18 @@ impl ControllerNotificationPolicy {
         self
     }
 
-    pub(super) fn notify_connected(&self) -> bool {
+    pub(in crate::controller::event) fn notify_connected(&self) -> bool {
         self.notify_connected
     }
 
-    pub(super) fn notify_disconnected(&self) -> bool {
+    pub(in crate::controller::event) fn notify_disconnected(&self) -> bool {
         self.notify_disconnected
     }
 
-    pub(super) fn notification_for_battery_warning(&self, warning: BatteryWarning) -> Notification {
+    pub(in crate::controller::event) fn notification_for_battery_warning(
+        &self,
+        warning: BatteryWarning,
+    ) -> Notification {
         match warning {
             BatteryWarning::Precise(percent) => Notification::with_urgency(
                 BATTERY_STATUS_TITLE,

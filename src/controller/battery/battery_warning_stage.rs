@@ -1,7 +1,4 @@
-use crate::{
-    controller::battery::{BatteryLevel, BatteryWarning},
-    controller::event::ControllerEvent,
-};
+use crate::controller::battery::{BatteryLevel, BatteryWarning};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BatteryWarningStage {
@@ -11,13 +8,6 @@ pub enum BatteryWarningStage {
 }
 
 impl BatteryWarningStage {
-    pub(crate) fn for_event(event: &ControllerEvent) -> Option<Self> {
-        match event {
-            ControllerEvent::BatteryWarning { warning, .. } => Self::for_warning(*warning),
-            ControllerEvent::Connected(_) | ControllerEvent::Disconnected(_) => None,
-        }
-    }
-
     pub(crate) fn diagnostic(warning_level: u8) -> Self {
         match warning_level {
             0 | 1 => Self::Medium,

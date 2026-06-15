@@ -1,7 +1,6 @@
 mod automatic_update_handle;
 mod automatic_update_loop;
 mod notify;
-mod update_process;
 
 use crate::{AppResult, config::UpdatesConfig, notifier::ToastNotifier};
 

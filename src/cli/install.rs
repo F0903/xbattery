@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 
 use xbattery::{
-    AppResult, dialog, elevation,
+    AppResult, dialog, elevate,
     startup::{StartupInstaller, StartupStatus, is_startup_access_denied},
 };
 
@@ -17,7 +17,7 @@ pub(super) fn install_interactive() -> AppResult<()> {
 }
 
 fn retry_install_elevated(error: Box<dyn std::error::Error + Send + Sync>) -> AppResult<()> {
-    match elevation::relaunch_current_exe_as_admin("install-elevated") {
+    match elevate::relaunch_current_exe_as_admin("install-elevated") {
         Ok(()) => Ok(()),
         Err(elevation_error) => {
             let message = format!(
