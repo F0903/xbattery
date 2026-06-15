@@ -73,7 +73,7 @@ enum Command {
     #[cfg(debug_assertions)]
     #[command(disable_help_flag = true)]
     RumbleTest,
-    /// Test 50%, 25%, and 10% battery rumble signal patterns.
+    /// Test medium, low, and empty battery rumble signal patterns.
     #[cfg(debug_assertions)]
     #[command(disable_help_flag = true)]
     RumbleTestThresholds,

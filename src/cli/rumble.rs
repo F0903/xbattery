@@ -1,6 +1,8 @@
 use std::{thread, time::Duration};
 
-use xbattery::{AppResult, config::AppConfig, controller::rumble};
+use xbattery::{
+    AppResult, config::AppConfig, controller::battery::BatteryLevel, controller::rumble,
+};
 
 pub(super) fn test() -> AppResult<()> {
     let config = AppConfig::load()?;
@@ -16,17 +18,22 @@ pub(super) fn test() -> AppResult<()> {
 pub(super) fn test_thresholds() -> AppResult<()> {
     const BETWEEN_PATTERNS: Duration = Duration::from_millis(1500);
     let patterns = [
-        ("50% / medium", 1, "configured medium-stage pattern"),
-        ("25% / low", 2, "configured low-stage pattern"),
-        ("10% / empty", 3, "configured empty-stage pattern"),
+        (BatteryLevel::Medium, 1, "configured medium-stage pattern"),
+        (BatteryLevel::Low, 2, "configured low-stage pattern"),
+        (BatteryLevel::Empty, 3, "configured empty-stage pattern"),
     ];
     let config = AppConfig::load()?;
     let rumble_config = config.rumble.controller_rumble_config()?;
 
     println!("Testing battery threshold rumble patterns.");
 
-    for (index, (label, warning_level, description)) in patterns.iter().enumerate() {
-        println!("  {}: {}", label, description);
+    for (index, (level, warning_level, description)) in patterns.iter().enumerate() {
+        println!(
+            "  ~{}% / {}: {}",
+            level.estimated_percent(),
+            level,
+            description
+        );
         let backend = rumble::rumble_single_controller(rumble_config.clone(), *warning_level)?;
         println!("    backend: {}", backend.description());
 
