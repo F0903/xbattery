@@ -4,10 +4,10 @@ use serde::Deserialize;
 
 use crate::{
     AppResult,
-    controller::rumble::{ControllerRumbleConfig, RumbleJolt, RumblePattern, RumblePatternSet},
+    controller::rumble::{ControllerRumbleConfig, RumbleJolt, RumblePatternSet},
 };
 
-use super::{RumbleJoltConfig, RumblePatternConfig, RumblePatternConfigSet};
+use super::{RumbleJoltConfig, RumblePatternConfigSet, pattern_resolver::RumblePatternResolver};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -22,23 +22,21 @@ pub struct RumbleConfig {
 impl RumbleConfig {
     pub fn controller_rumble_config(&self) -> AppResult<ControllerRumbleConfig> {
         let jolts = self.resolved_jolts()?;
-        let medium = self.resolve_pattern(
+        let resolver = RumblePatternResolver::new(&jolts);
+        let medium = resolver.resolve(
             "medium",
             self.patterns.medium.as_ref(),
             &[&["quick", "quick"]],
-            &jolts,
         )?;
-        let low = self.resolve_pattern(
+        let low = resolver.resolve(
             "low",
             self.patterns.low.as_ref(),
             &[&["quick", "quick", "strong"]],
-            &jolts,
         )?;
-        let empty = self.resolve_pattern(
+        let empty = resolver.resolve(
             "empty",
             self.patterns.empty.as_ref(),
             &[&["quick", "quick", "strong"], &["quick", "quick", "strong"]],
-            &jolts,
         )?;
 
         Ok(ControllerRumbleConfig::custom(
@@ -76,52 +74,6 @@ impl RumbleConfig {
         }
 
         Ok(jolts)
-    }
-
-    fn resolve_pattern(
-        &self,
-        stage: &str,
-        pattern: Option<&RumblePatternConfig>,
-        default_groups: &[&[&str]],
-        jolts: &BTreeMap<String, RumbleJolt>,
-    ) -> AppResult<RumblePattern> {
-        let groups = match pattern {
-            Some(pattern) => pattern
-                .groups
-                .iter()
-                .map(|group| group.iter().map(String::as_str).collect::<Vec<_>>())
-                .collect::<Vec<_>>(),
-            None => default_groups.iter().map(|group| group.to_vec()).collect(),
-        };
-
-        if groups.is_empty() {
-            return Err(format!("rumble.patterns.{stage}.groups must not be empty").into());
-        }
-
-        let mut resolved_groups = Vec::new();
-        for (index, group) in groups.into_iter().enumerate() {
-            if group.is_empty() {
-                return Err(format!(
-                    "rumble.patterns.{stage}.groups[{}] must not be empty",
-                    index
-                )
-                .into());
-            }
-
-            let mut resolved_group = Vec::new();
-            for jolt_name in group {
-                let Some(jolt) = jolts.get(jolt_name).copied() else {
-                    return Err(format!(
-                        "rumble.patterns.{stage} references unknown jolt \"{jolt_name}\""
-                    )
-                    .into());
-                };
-                resolved_group.push(jolt);
-            }
-            resolved_groups.push(resolved_group);
-        }
-
-        Ok(RumblePattern::new(resolved_groups))
     }
 }
 

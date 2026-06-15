@@ -5,7 +5,7 @@ use crate::controller::{
     event::ControllerEvent,
 };
 
-use super::Controller;
+use super::super::Controller;
 
 #[derive(Clone, Debug, Default)]
 pub struct ControllerMonitor {

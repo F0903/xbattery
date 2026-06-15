@@ -1,6 +1,7 @@
 mod config;
 mod jolt;
 mod pattern;
+mod pattern_resolver;
 mod pattern_set;
 
 pub use config::RumbleConfig;
