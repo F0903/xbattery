@@ -29,7 +29,7 @@ pub trait BatteryBackend {
     }
 
     fn attach_to_many(&self, controllers: Vec<Controller>) -> Vec<Controller> {
-        let Ok(readings) = self.battery_readings() else {
+        let Ok(readings) = self.settled_battery_readings() else {
             return controllers;
         };
 
@@ -59,4 +59,48 @@ pub trait BatteryBackend {
 
 pub trait RumbleBackend {
     fn rumble(&self, target: RumbleTarget, steps: &[RumbleStep]) -> AppResult<Option<BackendKind>>;
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::controller::{
+        Controller, ControllerSource,
+        backend::{BackendKind, BatteryBackend},
+        battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading},
+    };
+
+    #[test]
+    fn attach_to_many_uses_settled_battery_readings() {
+        let backend = FakeBatteryBackend;
+        let controllers = vec![Controller::new(
+            "one",
+            "Controller",
+            ControllerSource::GameInput,
+            reading(BatteryLevel::Full),
+        )];
+
+        let controllers = backend.attach_to_many(controllers);
+
+        assert_eq!(controllers[0].battery(), reading(BatteryLevel::Medium));
+    }
+
+    struct FakeBatteryBackend;
+
+    impl BatteryBackend for FakeBatteryBackend {
+        fn backend_kind(&self) -> BackendKind {
+            BackendKind::XInput
+        }
+
+        fn battery_readings(&self) -> crate::AppResult<Vec<BatteryReading>> {
+            Ok(vec![reading(BatteryLevel::Empty)])
+        }
+
+        fn settled_battery_readings(&self) -> crate::AppResult<Vec<BatteryReading>> {
+            Ok(vec![reading(BatteryLevel::Medium)])
+        }
+    }
+
+    fn reading(level: BatteryLevel) -> BatteryReading {
+        BatteryReading::new(BatteryKind::Alkaline, BatteryCharge::Coarse(level))
+    }
 }

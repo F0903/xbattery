@@ -12,7 +12,7 @@ use crate::{
 
 use super::{XInputDiagnosticReport, native, snapshot::ControllerSnapshot};
 
-const BATTERY_SETTLE_ATTEMPTS: usize = 5;
+const BATTERY_SETTLE_ATTEMPTS: usize = 13;
 const BATTERY_SETTLE_DELAY: Duration = Duration::from_millis(500);
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -134,22 +134,59 @@ fn motor_float_speed(value: f32) -> u16 {
 }
 
 fn should_wait_for_battery_to_settle(readings: &[BatteryReading]) -> bool {
+    readings.iter().any(is_suspicious_battery_reading)
+}
+
+fn is_suspicious_battery_reading(reading: &BatteryReading) -> bool {
     matches!(
-        readings,
-        [BatteryReading {
-            charge: BatteryCharge::Coarse(BatteryLevel::Empty | BatteryLevel::Low),
-            ..
-        }]
+        reading.charge,
+        BatteryCharge::Coarse(BatteryLevel::Empty | BatteryLevel::Low)
     )
 }
 
-fn battery_reading_score(readings: &[BatteryReading]) -> u8 {
-    match readings {
-        [reading] => match reading.charge {
-            BatteryCharge::Precise(percent) => percent,
-            BatteryCharge::Coarse(level) => level.estimated_percent(),
-            BatteryCharge::Unknown => 0,
-        },
-        _ => 0,
+fn battery_reading_score(readings: &[BatteryReading]) -> u16 {
+    readings.iter().map(single_battery_reading_score).sum()
+}
+
+fn single_battery_reading_score(reading: &BatteryReading) -> u16 {
+    match reading.charge {
+        BatteryCharge::Precise(percent) => percent.into(),
+        BatteryCharge::Coarse(level) => level.estimated_percent().into(),
+        BatteryCharge::Unknown => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::controller::battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading};
+
+    use super::{battery_reading_score, should_wait_for_battery_to_settle};
+
+    #[test]
+    fn waits_for_any_low_or_empty_battery_reading_to_settle() {
+        assert!(should_wait_for_battery_to_settle(&[
+            reading(BatteryLevel::Full),
+            reading(BatteryLevel::Low),
+        ]));
+
+        assert!(should_wait_for_battery_to_settle(&[reading(
+            BatteryLevel::Empty
+        )]));
+
+        assert!(!should_wait_for_battery_to_settle(&[reading(
+            BatteryLevel::Medium
+        )]));
+    }
+
+    #[test]
+    fn battery_reading_score_prefers_higher_total_charge() {
+        assert!(
+            battery_reading_score(&[reading(BatteryLevel::Full), reading(BatteryLevel::Medium)])
+                > battery_reading_score(&[reading(BatteryLevel::Full), reading(BatteryLevel::Low)])
+        );
+    }
+
+    fn reading(level: BatteryLevel) -> BatteryReading {
+        BatteryReading::new(BatteryKind::Alkaline, BatteryCharge::Coarse(level))
     }
 }
