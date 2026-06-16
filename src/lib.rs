@@ -1,4 +1,5 @@
 pub mod config;
+pub mod console;
 pub mod controller;
 pub mod dialog;
 pub mod elevate;
