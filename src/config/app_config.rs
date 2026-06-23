@@ -19,8 +19,6 @@ pub struct AppConfig {
     pub battery: BatteryConfig,
     pub notifications: NotificationsConfig,
     pub updates: UpdatesConfig,
-    #[serde(rename = "rumble")]
-    deprecated_rumble: Option<toml::Value>,
 }
 
 #[derive(Clone, Debug)]

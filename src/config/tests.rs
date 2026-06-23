@@ -130,22 +130,6 @@ fn parses_legacy_precise_warning_thresholds() {
 }
 
 #[test]
-fn ignores_deprecated_rumble_config() {
-    let config = toml::from_str::<AppConfig>(
-        r#"
-        [rumble]
-        enabled = true
-
-        [rumble.jolts.quick]
-        handle_strength_percent = 100
-        "#,
-    )
-    .unwrap();
-
-    config.validate().unwrap();
-}
-
-#[test]
 fn rejects_battery_level_without_matcher() {
     let config = toml::from_str::<AppConfig>(
         r#"
