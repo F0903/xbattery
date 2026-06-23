@@ -4,14 +4,34 @@
 poll_interval_seconds = 60
 control_wait_slice_millis = 250
 
-[battery]
-precise_warning_thresholds = [50, 25, 10]
+[battery.levels.full]
+threshold_percent = 100
+coarse_level = "full"
+notify = false
+urgent = false
+
+[battery.levels.medium]
+threshold_percent = 70
+coarse_level = "medium"
+notify = true
+urgent = false
+
+[battery.levels.low]
+threshold_percent = 40
+coarse_level = "low"
+notify = true
+urgent = false
+
+[battery.levels.empty]
+threshold_percent = 10
+coarse_level = "empty"
+notify = true
+urgent = true
 
 [notifications]
 app_id = "xbattery"
 notify_connected = true
 notify_disconnected = true
-urgent_precise_threshold_percent = 10
 
 [updates]
 repo_owner = "F0903"
@@ -22,29 +42,3 @@ check_automatically = true
 check_interval_hours = 24
 auto_install = false
 notify_available = true
-
-[rumble]
-enabled = false
-gap_millis = 45
-group_gap_millis = 200
-
-[rumble.jolts.quick]
-handle_strength_percent = 100
-trigger_strength_percent = 75
-handle_millis = 35
-trigger_millis = 50
-
-[rumble.jolts.strong]
-handle_strength_percent = 100
-trigger_strength_percent = 100
-handle_millis = 75
-trigger_millis = 100
-
-[rumble.patterns.medium]
-groups = [["quick", "quick"]]
-
-[rumble.patterns.low]
-groups = [["quick", "quick", "strong"]]
-
-[rumble.patterns.empty]
-groups = [["quick", "quick", "strong"], ["quick", "quick", "strong"]]

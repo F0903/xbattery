@@ -58,14 +58,6 @@ pub(super) enum Command {
     #[cfg(debug_assertions)]
     #[command(disable_help_flag = true)]
     GameinputWatch,
-    /// Send the critical battery rumble pattern to the single connected controller.
-    #[cfg(debug_assertions)]
-    #[command(disable_help_flag = true)]
-    RumbleTest,
-    /// Test medium, low, and empty battery rumble signal patterns.
-    #[cfg(debug_assertions)]
-    #[command(disable_help_flag = true)]
-    RumbleTestThresholds,
     /// Send a test toast notification.
     #[cfg(debug_assertions)]
     #[command(disable_help_flag = true)]

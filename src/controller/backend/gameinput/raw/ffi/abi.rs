@@ -28,53 +28,6 @@ type GameInputGuideButtonCallback =
 type GameInputKeyboardLayoutCallback =
     Option<unsafe extern "system" fn(u64, *mut c_void, *mut IGameInputDevice, u64, u32, u32)>;
 
-pub(super) const GAMEINPUT_RUMBLE_NONE: i32 = 0x0000_0000;
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
-pub(super) struct GameInputRumbleParams {
-    pub(super) low_frequency: f32,
-    pub(super) high_frequency: f32,
-    pub(super) left_trigger: f32,
-    pub(super) right_trigger: f32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(super) struct GameInputDeviceInfoPrefix {
-    pub(super) info_size: u32,
-    pub(super) vendor_id: u16,
-    pub(super) product_id: u16,
-    pub(super) revision_number: u16,
-    pub(super) interface_number: u8,
-    pub(super) collection_number: u8,
-    pub(super) usage: GameInputUsage,
-    pub(super) hardware_version: GameInputVersion,
-    pub(super) firmware_version: GameInputVersion,
-    pub(super) device_id: [u8; 32],
-    pub(super) device_root_id: [u8; 32],
-    pub(super) device_family: i32,
-    pub(super) capabilities: i32,
-    pub(super) supported_input: i32,
-    pub(super) supported_rumble_motors: i32,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(super) struct GameInputUsage {
-    pub(super) page: u16,
-    pub(super) id: u16,
-}
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub(super) struct GameInputVersion {
-    pub(super) major: u16,
-    pub(super) minor: u16,
-    pub(super) build: u16,
-    pub(super) revision: u16,
-}
-
 #[repr(C)]
 #[allow(non_snake_case)]
 pub(super) struct IGameInputVtbl {
@@ -157,20 +110,6 @@ pub(super) struct IGameInputDeviceVtbl {
     pub(super) GetDeviceStatus: unsafe extern "system" fn(*mut IGameInputDevice) -> i32,
     pub(super) GetBatteryState:
         unsafe extern "system" fn(*mut IGameInputDevice, *mut GameInputBatteryState),
-    pub(super) CreateForceFeedbackEffect: unsafe extern "system" fn(
-        *mut IGameInputDevice,
-        u32,
-        *const c_void,
-        *mut *mut c_void,
-    ) -> HRESULT,
-    pub(super) IsForceFeedbackMotorPoweredOn:
-        unsafe extern "system" fn(*mut IGameInputDevice, u32) -> bool,
-    pub(super) SetForceFeedbackMotorGain:
-        unsafe extern "system" fn(*mut IGameInputDevice, u32, f32),
-    pub(super) SetHapticMotorState:
-        unsafe extern "system" fn(*mut IGameInputDevice, u32, *const c_void) -> HRESULT,
-    pub(super) SetRumbleState:
-        unsafe extern "system" fn(*mut IGameInputDevice, *const GameInputRumbleParams),
 }
 
 #[repr(C)]

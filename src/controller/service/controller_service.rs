@@ -6,59 +6,48 @@ use super::{ControllerServiceConfig, run_state::RunState};
 use crate::controller::{
     backend::{
         BackendEvent, BackendEventStream, BatteryBackend, EventBackend, GameInputBackend,
-        InputBackend, RumbleBackend, XInputBackend,
+        InputBackend, XInputBackend,
     },
     event::ControllerEvent,
     monitor::ControllerMonitor,
-    rumble::BatteryWarningRumbler,
 };
 
-pub struct ControllerService<
-    N: Notifier,
-    I = GameInputBackend,
-    B = XInputBackend,
-    R = GameInputBackend,
-> {
+pub struct ControllerService<N: Notifier, I = GameInputBackend, B = XInputBackend> {
     pub(super) monitor: ControllerMonitor,
     pub(super) input: I,
     pub(super) battery: B,
     pub(super) notifier: N,
-    pub(super) rumbler: BatteryWarningRumbler<R>,
     pub(super) config: ControllerServiceConfig,
 }
 
-impl<N: Notifier> ControllerService<N, GameInputBackend, XInputBackend, GameInputBackend> {
+impl<N: Notifier> ControllerService<N, GameInputBackend, XInputBackend> {
     pub fn new(notifier: N, config: ControllerServiceConfig) -> Self {
         Self::with_providers(
             notifier,
             config,
             GameInputBackend::new(),
             XInputBackend::new(),
-            GameInputBackend::new(),
         )
     }
 }
 
-impl<N, I, B, R> ControllerService<N, I, B, R>
+impl<N, I, B> ControllerService<N, I, B>
 where
     N: Notifier,
     I: InputBackend + EventBackend,
     B: BatteryBackend,
-    R: RumbleBackend + Clone + Send + 'static,
 {
     pub fn with_providers(
         notifier: N,
         config: ControllerServiceConfig,
         input: I,
         battery: B,
-        rumbler: R,
     ) -> Self {
         Self {
             monitor: ControllerMonitor::with_warning_policy(config.warning_policy().clone()),
             input,
             battery,
             notifier,
-            rumbler: BatteryWarningRumbler::with_backend(config.rumble_config().clone(), rumbler),
             config,
         }
     }
@@ -98,7 +87,6 @@ where
     pub fn apply_config(&mut self, config: ControllerServiceConfig) {
         self.monitor
             .set_warning_policy(config.warning_policy().clone());
-        self.rumbler.set_config(config.rumble_config().clone());
         self.config = config;
     }
 
@@ -199,8 +187,6 @@ where
 
     fn notify_events(&self, events: Vec<ControllerEvent>) -> AppResult<()> {
         for event in events {
-            self.rumbler.rumble_for_event(&event);
-
             if let Some(notification) = event.notification(self.config.notification_policy()) {
                 self.notifier.notify(&notification)?;
             }

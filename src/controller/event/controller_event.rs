@@ -1,9 +1,7 @@
 use crate::{
     controller::{
         Controller,
-        battery::{
-            BatteryCharge, BatteryKind, BatteryReading, BatteryWarning, BatteryWarningStage,
-        },
+        battery::{BatteryCharge, BatteryKind, BatteryReading, BatteryWarning},
     },
     notifier::Notification,
 };
@@ -28,13 +26,6 @@ impl ControllerEvent {
         }
     }
 
-    pub fn battery_warning_stage(&self) -> Option<BatteryWarningStage> {
-        match self {
-            Self::BatteryWarning { warning, .. } => BatteryWarningStage::for_warning(*warning),
-            Self::Connected(_) | Self::Disconnected(_) => None,
-        }
-    }
-
     pub fn notification(&self, policy: &ControllerNotificationPolicy) -> Option<Notification> {
         match self {
             Self::Connected(_) if !policy.notify_connected() => None,
@@ -50,7 +41,7 @@ impl ControllerEvent {
             Self::BatteryWarning {
                 current: _,
                 warning,
-            } => Some(policy.notification_for_battery_warning(*warning)),
+            } => Some(policy.notification_for_battery_warning(warning)),
         }
     }
 }

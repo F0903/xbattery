@@ -8,6 +8,6 @@ mod xinput;
 pub use backend_event::{BackendEvent, BackendEventStream};
 pub use backend_kind::BackendKind;
 pub use gameinput::GameInputBackend;
-pub use traits::{BatteryBackend, EventBackend, InputBackend, RumbleBackend};
+pub use traits::{BatteryBackend, EventBackend, InputBackend};
 pub use win_rt::WinRTBackend;
 pub use xinput::XInputBackend;

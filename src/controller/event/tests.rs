@@ -1,7 +1,10 @@
 use crate::{
     controller::{
         Controller, ControllerSource,
-        battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning},
+        battery::{
+            BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning,
+            BatteryWarningLevel,
+        },
     },
     notifier::NotificationUrgency,
 };
@@ -71,7 +74,7 @@ fn disconnected_notifications_use_user_facing_copy() {
 fn precise_critical_battery_notifications_are_urgent() {
     let event = ControllerEvent::BatteryWarning {
         current: controller(BatteryCharge::Precise(10)),
-        warning: BatteryWarning::Precise(10),
+        warning: precise_warning(10, true),
     };
 
     assert_eq!(
@@ -87,7 +90,7 @@ fn precise_critical_battery_notifications_are_urgent() {
 fn precise_battery_notifications_use_user_facing_copy() {
     let event = ControllerEvent::BatteryWarning {
         current: controller(BatteryCharge::Precise(50)),
-        warning: BatteryWarning::Precise(50),
+        warning: precise_warning(50, false),
     };
     let notification = event
         .notification(&ControllerNotificationPolicy::default())
@@ -102,7 +105,7 @@ fn precise_battery_notifications_use_user_facing_copy() {
 fn precise_noncritical_battery_notifications_are_high_priority() {
     let event = ControllerEvent::BatteryWarning {
         current: controller(BatteryCharge::Precise(25)),
-        warning: BatteryWarning::Precise(25),
+        warning: precise_warning(25, false),
     };
 
     assert_eq!(
@@ -115,15 +118,15 @@ fn precise_noncritical_battery_notifications_are_high_priority() {
 }
 
 #[test]
-fn precise_urgency_threshold_can_be_configured() {
+fn battery_warning_urgency_can_be_configured_per_level() {
     let event = ControllerEvent::BatteryWarning {
         current: controller(BatteryCharge::Precise(20)),
-        warning: BatteryWarning::Precise(20),
+        warning: precise_warning(20, true),
     };
 
     assert_eq!(
         event
-            .notification(&ControllerNotificationPolicy::new(25))
+            .notification(&ControllerNotificationPolicy::default())
             .unwrap()
             .urgency(),
         NotificationUrgency::Urgent
@@ -134,7 +137,7 @@ fn precise_urgency_threshold_can_be_configured() {
 fn coarse_battery_notifications_use_user_facing_copy() {
     let event = ControllerEvent::BatteryWarning {
         current: controller(BatteryCharge::Coarse(BatteryLevel::Medium)),
-        warning: BatteryWarning::Coarse(BatteryLevel::Medium),
+        warning: coarse_warning(BatteryLevel::Medium, false),
     };
     let notification = event
         .notification(&ControllerNotificationPolicy::default())
@@ -149,7 +152,7 @@ fn coarse_battery_notifications_use_user_facing_copy() {
 fn coarse_empty_battery_notifications_are_urgent() {
     let event = ControllerEvent::BatteryWarning {
         current: controller(BatteryCharge::Coarse(BatteryLevel::Empty)),
-        warning: BatteryWarning::Coarse(BatteryLevel::Empty),
+        warning: coarse_warning(BatteryLevel::Empty, true),
     };
 
     assert_eq!(
@@ -167,5 +170,19 @@ fn controller(charge: BatteryCharge) -> Controller {
         "Controller",
         ControllerSource::XInput,
         BatteryReading::new(BatteryKind::Unknown, charge),
+    )
+}
+
+fn precise_warning(percent: u8, urgent: bool) -> BatteryWarning {
+    BatteryWarning::precise(
+        percent,
+        BatteryWarningLevel::new(format!("{percent}%"), Some(percent), None, urgent),
+    )
+}
+
+fn coarse_warning(level: BatteryLevel, urgent: bool) -> BatteryWarning {
+    BatteryWarning::coarse(
+        level,
+        BatteryWarningLevel::new(level.to_string(), None, Some(level), urgent),
     )
 }

@@ -1,5 +1,5 @@
 use crate::{
-    controller::battery::{BatteryLevel, BatteryWarning},
+    controller::battery::{BatteryWarning, BatteryWarningReading},
     notifier::{Notification, NotificationUrgency},
 };
 
@@ -7,15 +7,13 @@ const BATTERY_STATUS_TITLE: &str = "Xbox Controller Battery Status";
 
 #[derive(Clone, Debug)]
 pub struct ControllerNotificationPolicy {
-    urgent_precise_threshold_percent: u8,
     notify_connected: bool,
     notify_disconnected: bool,
 }
 
 impl ControllerNotificationPolicy {
-    pub fn new(urgent_precise_threshold_percent: u8) -> Self {
+    pub fn new() -> Self {
         Self {
-            urgent_precise_threshold_percent,
             notify_connected: true,
             notify_disconnected: true,
         }
@@ -41,41 +39,33 @@ impl ControllerNotificationPolicy {
 
     pub(in crate::controller::event) fn notification_for_battery_warning(
         &self,
-        warning: BatteryWarning,
+        warning: &BatteryWarning,
     ) -> Notification {
-        match warning {
-            BatteryWarning::Precise(percent) => Notification::with_urgency(
+        match warning.reading() {
+            BatteryWarningReading::Precise(percent) => Notification::with_urgency(
                 BATTERY_STATUS_TITLE,
                 format!("Battery level is {percent}%"),
-                self.precise_warning_urgency(percent),
+                warning_urgency(warning),
             ),
-            BatteryWarning::Coarse(level) => Notification::with_urgency(
+            BatteryWarningReading::Coarse(level) => Notification::with_urgency(
                 BATTERY_STATUS_TITLE,
                 format!("Battery level is ~{}%", level.estimated_percent()),
-                self.coarse_warning_urgency(level),
+                warning_urgency(warning),
             ),
-        }
-    }
-
-    fn precise_warning_urgency(&self, percent: u8) -> NotificationUrgency {
-        if percent <= self.urgent_precise_threshold_percent {
-            NotificationUrgency::Urgent
-        } else {
-            NotificationUrgency::High
-        }
-    }
-
-    fn coarse_warning_urgency(&self, level: BatteryLevel) -> NotificationUrgency {
-        match level {
-            BatteryLevel::Empty => NotificationUrgency::Urgent,
-            BatteryLevel::Low | BatteryLevel::Medium => NotificationUrgency::High,
-            BatteryLevel::Full => NotificationUrgency::Normal,
         }
     }
 }
 
 impl Default for ControllerNotificationPolicy {
     fn default() -> Self {
-        Self::new(10)
+        Self::new()
+    }
+}
+
+fn warning_urgency(warning: &BatteryWarning) -> NotificationUrgency {
+    if warning.urgent() {
+        NotificationUrgency::Urgent
+    } else {
+        NotificationUrgency::High
     }
 }

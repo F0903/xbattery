@@ -1,10 +1,6 @@
 use crate::{
     AppResult,
-    controller::{
-        Controller,
-        battery::BatteryReading,
-        rumble::{RumbleStep, RumbleTarget},
-    },
+    controller::{Controller, battery::BatteryReading},
 };
 
 use super::{BackendEvent, BackendEventStream, BackendKind};
@@ -55,10 +51,6 @@ pub trait BatteryBackend {
             _ => controller,
         }
     }
-}
-
-pub trait RumbleBackend {
-    fn rumble(&self, target: RumbleTarget, steps: &[RumbleStep]) -> AppResult<Option<BackendKind>>;
 }
 
 #[cfg(test)]

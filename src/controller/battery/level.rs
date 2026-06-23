@@ -1,6 +1,9 @@
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+use serde::Deserialize;
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Ord, PartialOrd)]
+#[serde(rename_all = "lowercase")]
 pub enum BatteryLevel {
     Empty,
     Low,

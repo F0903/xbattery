@@ -6,7 +6,6 @@ mod controller_source;
 mod controller_type;
 pub mod event;
 pub mod monitor;
-pub mod rumble;
 pub mod service;
 
 pub use controller_source::ControllerSource;

@@ -4,8 +4,8 @@ use windows::Win32::{
         BATTERY_DEVTYPE_GAMEPAD, BATTERY_LEVEL, BATTERY_LEVEL_EMPTY, BATTERY_LEVEL_FULL,
         BATTERY_LEVEL_LOW, BATTERY_LEVEL_MEDIUM, BATTERY_TYPE, BATTERY_TYPE_ALKALINE,
         BATTERY_TYPE_DISCONNECTED, BATTERY_TYPE_NIMH, BATTERY_TYPE_UNKNOWN, BATTERY_TYPE_WIRED,
-        XINPUT_BATTERY_INFORMATION, XINPUT_STATE, XINPUT_VIBRATION, XInputGetBatteryInformation,
-        XInputGetState, XInputSetState, XUSER_MAX_COUNT,
+        XINPUT_BATTERY_INFORMATION, XINPUT_STATE, XInputGetBatteryInformation, XInputGetState,
+        XUSER_MAX_COUNT,
     },
 };
 
@@ -24,37 +24,6 @@ pub fn poll_controllers() -> AppResult<[Option<ControllerSnapshot>; XUSER_MAX_CO
     }
 
     Ok(snapshots)
-}
-
-pub fn single_connected_slot() -> AppResult<Option<u32>> {
-    let slots = poll_controllers()?
-        .into_iter()
-        .flatten()
-        .map(|snapshot| snapshot.slot)
-        .collect::<Vec<_>>();
-
-    match slots.as_slice() {
-        [slot] => Ok(Some(*slot)),
-        _ => Ok(None),
-    }
-}
-
-pub fn set_vibration(slot: u32, left_motor_speed: u16, right_motor_speed: u16) -> AppResult<()> {
-    let vibration = XINPUT_VIBRATION {
-        wLeftMotorSpeed: left_motor_speed,
-        wRightMotorSpeed: right_motor_speed,
-    };
-    let result = unsafe { XInputSetState(slot, &vibration) };
-
-    if result != ERROR_SUCCESS.0 {
-        return Err(format!("XInputSetState failed for slot {}: {}", slot, result).into());
-    }
-
-    Ok(())
-}
-
-pub fn stop_vibration(slot: u32) -> AppResult<()> {
-    set_vibration(slot, 0, 0)
 }
 
 fn poll_controller(slot: u32) -> AppResult<Option<ControllerSnapshot>> {

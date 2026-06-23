@@ -2,10 +2,7 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use super::{
-    BatteryConfig, MonitorConfig, NotificationsConfig, RumbleConfig, UpdatesConfig, load,
-    validation,
-};
+use super::{BatteryConfig, MonitorConfig, NotificationsConfig, UpdatesConfig, load, validation};
 use crate::{
     AppResult,
     controller::{
@@ -21,8 +18,9 @@ pub struct AppConfig {
     pub monitor: MonitorConfig,
     pub battery: BatteryConfig,
     pub notifications: NotificationsConfig,
-    pub rumble: RumbleConfig,
     pub updates: UpdatesConfig,
+    #[serde(rename = "rumble")]
+    deprecated_rumble: Option<toml::Value>,
 }
 
 #[derive(Clone, Debug)]
@@ -54,13 +52,14 @@ impl AppConfig {
         Ok(ControllerServiceConfig::new(
             self.monitor.poll_interval(),
             self.monitor.control_wait_slice(),
-            BatteryWarningPolicy::new(self.battery.precise_warning_thresholds.clone()),
-            ControllerNotificationPolicy::new(self.notifications.urgent_precise_threshold_percent)
-                .with_connectivity_notifications(
-                    self.notifications.notify_connected,
-                    self.notifications.notify_disconnected,
-                ),
-            self.rumble.controller_rumble_config()?,
+            BatteryWarningPolicy::new(
+                self.battery
+                    .warning_levels(self.notifications.urgent_precise_threshold_percent),
+            ),
+            ControllerNotificationPolicy::new().with_connectivity_notifications(
+                self.notifications.notify_connected,
+                self.notifications.notify_disconnected,
+            ),
         ))
     }
 

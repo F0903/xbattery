@@ -2,11 +2,7 @@ use crate::{
     AppResult,
     controller::{
         Controller, ControllerSource,
-        backend::{
-            BackendEvent, BackendEventStream, BackendKind, EventBackend, InputBackend,
-            RumbleBackend,
-        },
-        rumble::{RumbleStep, RumbleTarget},
+        backend::{BackendEvent, BackendEventStream, EventBackend, InputBackend},
     },
 };
 
@@ -68,19 +64,5 @@ impl InputBackend for GameInputBackend {
             .filter(|snapshot| snapshot.is_connected())
             .map(Self::controller_from_snapshot)
             .collect())
-    }
-}
-
-impl RumbleBackend for GameInputBackend {
-    fn rumble(
-        &self,
-        _target: RumbleTarget,
-        steps: &[RumbleStep],
-    ) -> AppResult<Option<BackendKind>> {
-        if raw::play_rumble_on_single_gamepad(steps)? {
-            Ok(Some(BackendKind::GameInput))
-        } else {
-            Ok(None)
-        }
     }
 }

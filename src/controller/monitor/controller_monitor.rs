@@ -124,7 +124,10 @@ impl ControllerMonitor {
 mod tests {
     use crate::controller::{
         Controller, ControllerSource,
-        battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading},
+        battery::{
+            BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning,
+            BatteryWarningLevel,
+        },
         event::ControllerEvent,
     };
 
@@ -164,7 +167,10 @@ mod tests {
             events,
             vec![ControllerEvent::BatteryWarning {
                 current: medium,
-                warning: crate::controller::battery::BatteryWarning::Coarse(BatteryLevel::Medium),
+                warning: BatteryWarning::coarse(
+                    BatteryLevel::Medium,
+                    BatteryWarningLevel::new("medium", Some(70), Some(BatteryLevel::Medium), false,),
+                ),
             }]
         );
     }

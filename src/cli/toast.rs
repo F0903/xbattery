@@ -6,7 +6,10 @@ use xbattery::{
     controller::{
         Controller, ControllerSource,
         backend::BackendKind,
-        battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning},
+        battery::{
+            BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning,
+            BatteryWarningLevel,
+        },
         event::{ControllerEvent, ControllerNotificationPolicy},
     },
     notifier::{NotificationUrgency, Notifier, ToastNotifier},
@@ -49,11 +52,12 @@ pub(super) fn test_urgent() -> AppResult<()> {
 
 pub(super) fn preview() -> AppResult<()> {
     let config = AppConfig::load()?;
-    let policy =
-        ControllerNotificationPolicy::new(config.notifications.urgent_precise_threshold_percent)
-            .with_connectivity_notifications(true, true);
+    let policy = ControllerNotificationPolicy::new().with_connectivity_notifications(true, true);
     let notifier = ToastNotifier::new(config.toast_config());
-    let previews = preview_events();
+    let warning_levels = config
+        .battery
+        .warning_levels(config.notifications.urgent_precise_threshold_percent);
+    let previews = preview_events(&warning_levels);
 
     println!("Sending xbattery notification preview.");
 
@@ -73,14 +77,14 @@ pub(super) fn preview() -> AppResult<()> {
 }
 
 struct PreviewEvent {
-    label: &'static str,
+    label: String,
     event: ControllerEvent,
 }
 
-fn preview_events() -> Vec<PreviewEvent> {
-    vec![
+fn preview_events(warning_levels: &[BatteryWarningLevel]) -> Vec<PreviewEvent> {
+    let mut previews = vec![
         PreviewEvent {
-            label: "connected",
+            label: "connected".to_string(),
             event: ControllerEvent::Connected(sample_controller(
                 BackendKind::XInput,
                 BatteryReading::new(
@@ -90,45 +94,80 @@ fn preview_events() -> Vec<PreviewEvent> {
             )),
         },
         PreviewEvent {
-            label: "disconnected",
+            label: "disconnected".to_string(),
             event: ControllerEvent::Disconnected(sample_controller(
                 BackendKind::XInput,
                 BatteryReading::new(BatteryKind::Disconnected, BatteryCharge::Unknown),
             )),
         },
-        precise_warning("50% battery warning", 50),
-        precise_warning("25% battery warning", 25),
-        precise_warning("10% critical battery warning", 10),
-        coarse_warning("medium coarse battery warning", BatteryLevel::Medium),
-        coarse_warning("low coarse battery warning", BatteryLevel::Low),
-        coarse_warning("empty critical coarse battery warning", BatteryLevel::Empty),
-    ]
+    ];
+
+    let mut precise_levels = warning_levels
+        .iter()
+        .filter(|level| level.notify())
+        .filter_map(|level| {
+            level
+                .precise_threshold_percent()
+                .map(|threshold| (threshold, level.clone()))
+        })
+        .collect::<Vec<_>>();
+    precise_levels.sort_by(|(left, _), (right, _)| right.cmp(left));
+
+    for (threshold, level) in precise_levels {
+        previews.push(precise_warning(threshold, level));
+    }
+
+    let mut coarse_levels = warning_levels
+        .iter()
+        .filter(|level| level.notify())
+        .filter_map(|level| {
+            level
+                .coarse_level()
+                .map(|coarse_level| (coarse_level, level.clone()))
+        })
+        .collect::<Vec<_>>();
+    coarse_levels.sort_by(|(left, _), (right, _)| right.cmp(left));
+
+    for (coarse_level, level) in coarse_levels {
+        previews.push(coarse_warning(coarse_level, level));
+    }
+
+    previews
 }
 
-fn precise_warning(label: &'static str, percent: u8) -> PreviewEvent {
+fn precise_warning(percent: u8, level: BatteryWarningLevel) -> PreviewEvent {
     PreviewEvent {
-        label,
+        label: warning_label(&level, format!("{percent}% battery warning")),
         event: ControllerEvent::BatteryWarning {
             current: sample_controller(
                 BackendKind::GameInput,
                 BatteryReading::new(BatteryKind::Alkaline, BatteryCharge::Precise(percent)),
             ),
-            warning: BatteryWarning::Precise(percent),
+            warning: BatteryWarning::precise(percent, level),
         },
     }
 }
 
-fn coarse_warning(label: &'static str, level: BatteryLevel) -> PreviewEvent {
+fn coarse_warning(coarse_level: BatteryLevel, level: BatteryWarningLevel) -> PreviewEvent {
     PreviewEvent {
-        label,
+        label: warning_label(&level, format!("{coarse_level} coarse battery warning")),
         event: ControllerEvent::BatteryWarning {
             current: sample_controller(
                 BackendKind::XInput,
-                BatteryReading::new(BatteryKind::Alkaline, BatteryCharge::Coarse(level)),
+                BatteryReading::new(BatteryKind::Alkaline, BatteryCharge::Coarse(coarse_level)),
             ),
-            warning: BatteryWarning::Coarse(level),
+            warning: BatteryWarning::coarse(coarse_level, level),
         },
     }
+}
+
+fn warning_label(level: &BatteryWarningLevel, detail: String) -> String {
+    let urgency = if level.urgent() {
+        "urgent"
+    } else {
+        "high priority"
+    };
+    format!("{}: {detail} ({urgency})", level.name())
 }
 
 fn sample_controller(battery_source: BackendKind, battery: BatteryReading) -> Controller {

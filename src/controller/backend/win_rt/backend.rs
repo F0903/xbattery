@@ -2,9 +2,8 @@ use crate::{
     AppResult,
     controller::{
         Controller, ControllerSource,
-        backend::{BackendKind, BatteryBackend, InputBackend, RumbleBackend},
+        backend::{BackendKind, BatteryBackend, InputBackend},
         battery::BatteryReading,
-        rumble::{RumbleStep, RumbleTarget},
     },
 };
 
@@ -59,19 +58,5 @@ impl BatteryBackend for WinRTBackend {
             .filter(|report| report.percent.is_some())
             .map(|report| report.battery())
             .collect())
-    }
-}
-
-impl RumbleBackend for WinRTBackend {
-    fn rumble(
-        &self,
-        _target: RumbleTarget,
-        steps: &[RumbleStep],
-    ) -> AppResult<Option<BackendKind>> {
-        if windows_gaming_input::play_rumble_on_single_gamepad(steps)? {
-            Ok(Some(BackendKind::WinRT))
-        } else {
-            Ok(None)
-        }
     }
 }

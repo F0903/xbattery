@@ -2,15 +2,14 @@
 
 Xbox controller battery notifications for Windows.
 
-xbattery runs quietly in the background and sends Windows toast notifications when a controller connects, disconnects, or drops to a configured battery level. It can also play short controller rumble signals for low battery warnings.
+xbattery runs quietly in the background and sends Windows toast notifications when a controller connects, disconnects, or drops to a configured battery level.
 
 ## Features
 
 - Starts automatically when you sign in.
-- Sends battery warnings at 50%, 25%, and 10% by default.
-- Uses high-priority or urgent Windows toasts for battery warnings.
+- Sends battery warnings at 70%, 40%, and 10% by default.
+- Lets each configured battery warning level request high-priority or urgent Windows toasts.
 - Lets you disable connect/disconnect notifications.
-- Supports optional custom rumble patterns for each battery warning stage.
 - Works with Xbox Wireless Adapter controllers through Windows controller APIs.
 
 Some Windows controller APIs only expose coarse battery levels instead of exact percentages. In that case xbattery warns when the controller drops through `medium`, `low`, and `empty`.
@@ -67,13 +66,33 @@ Common options:
 [monitor]
 poll_interval_seconds = 60
 
-[battery]
-precise_warning_thresholds = [50, 25, 10]
+[battery.levels.full]
+threshold_percent = 100
+coarse_level = "full"
+notify = false
+urgent = false
+
+[battery.levels.medium]
+threshold_percent = 70
+coarse_level = "medium"
+notify = true
+urgent = false
+
+[battery.levels.low]
+threshold_percent = 40
+coarse_level = "low"
+notify = true
+urgent = false
+
+[battery.levels.empty]
+threshold_percent = 10
+coarse_level = "empty"
+notify = true
+urgent = true
 
 [notifications]
 notify_connected = true
 notify_disconnected = true
-urgent_precise_threshold_percent = 10
 
 [updates]
 repo_owner = "F0903"
@@ -84,45 +103,13 @@ check_automatically = true
 check_interval_hours = 24
 auto_install = false
 notify_available = true
-
-[rumble]
-enabled = false
-gap_millis = 45
-group_gap_millis = 200
 ```
 
 Set `notify_connected` or `notify_disconnected` to `false` if you only want battery warnings.
 
-Set `rumble.enabled` to `true` to add rumble feedback when a battery warning fires.
+Each battery level can match precise battery APIs with `threshold_percent`, coarse battery APIs with `coarse_level`, or both. Set `notify = true` for levels that should trigger a battery warning, and `urgent = true` for levels that should request urgent Windows toast delivery.
 
-### Rumble Patterns
-
-Rumble patterns are made from named "jolts", which define the strength and duration of the rumble feedback. You can then use these to define patterns or groups of patterns to play at each battery level.
-
-```toml
-[rumble.jolts.quick]
-handle_strength_percent = 100
-trigger_strength_percent = 75
-handle_millis = 35
-trigger_millis = 50
-
-[rumble.jolts.strong]
-handle_strength_percent = 100
-trigger_strength_percent = 100
-handle_millis = 75
-trigger_millis = 100
-
-[rumble.patterns.medium]
-groups = [["quick", "quick"]]
-
-[rumble.patterns.low]
-groups = [["quick", "quick", "strong"]]
-
-[rumble.patterns.empty]
-groups = [["quick", "quick", "strong"], ["quick", "quick", "strong"]]
-```
-
-Each jolt starts in the controller handles and quickly moves into the triggers. Each pattern group runs its jolts in order; `group_gap_millis` separates groups.
+The default `100` / `70` / `40` / `10` percentages match the bucketed values that Windows exposes for most Xbox-style controllers: full, medium, low, and critical/empty. `full` is defined for completeness but does not notify by default.
 
 ## Notification Visibility
 
@@ -189,6 +176,4 @@ cargo run -- probe
 cargo run -- gameinput-probe
 cargo run -- gameinput-watch
 cargo run -- notification-preview
-cargo run -- rumble-test
-cargo run -- rumble-test-thresholds
 ```

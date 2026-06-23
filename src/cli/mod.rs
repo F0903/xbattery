@@ -6,8 +6,6 @@ mod help;
 mod install;
 mod monitor;
 #[cfg(debug_assertions)]
-mod rumble;
-#[cfg(debug_assertions)]
 mod toast;
 mod update;
 
@@ -42,10 +40,6 @@ pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
         Some(Command::GameinputProbe) => diagnostics::gameinput_probe(),
         #[cfg(debug_assertions)]
         Some(Command::GameinputWatch) => diagnostics::gameinput_watch(),
-        #[cfg(debug_assertions)]
-        Some(Command::RumbleTest) => rumble::test(),
-        #[cfg(debug_assertions)]
-        Some(Command::RumbleTestThresholds) => rumble::test_thresholds(),
         #[cfg(debug_assertions)]
         Some(Command::ToastTest) => toast::test(),
         #[cfg(debug_assertions)]

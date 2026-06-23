@@ -1,8 +1,6 @@
-use std::thread;
+use windows::Gaming::Input::{Gamepad, RawGameController};
 
-use windows::Gaming::Input::{Gamepad, GamepadVibration, RawGameController};
-
-use crate::{AppResult, controller::rumble::RumbleStep};
+use crate::AppResult;
 
 use super::{GamepadReport, RawControllerReport};
 
@@ -53,29 +51,6 @@ pub fn gamepad_reports() -> AppResult<Vec<GamepadReport>> {
     Ok(reports)
 }
 
-pub fn play_rumble_on_single_gamepad(steps: &[RumbleStep]) -> AppResult<bool> {
-    if steps.is_empty() {
-        return Ok(false);
-    }
-
-    let gamepads = Gamepad::Gamepads()?;
-    if gamepads.Size()? != 1 {
-        return Ok(false);
-    }
-
-    let gamepad = gamepads.GetAt(0)?;
-    for step in steps {
-        if let Err(err) = gamepad.SetVibration(vibration_for_step(*step)) {
-            let _ = stop_gamepad_vibration(&gamepad);
-            return Err(err.into());
-        }
-        thread::sleep(step.duration);
-    }
-
-    stop_gamepad_vibration(&gamepad)?;
-    Ok(true)
-}
-
 fn battery_capacity(
     report: windows::Devices::Power::BatteryReport,
 ) -> (Option<i32>, Option<i32>, Option<u8>) {
@@ -96,21 +71,4 @@ fn battery_capacity(
     };
 
     (remaining_mwh, full_charge_mwh, percent)
-}
-
-fn vibration_for_step(step: RumbleStep) -> GamepadVibration {
-    GamepadVibration {
-        LeftMotor: rumble_value(step.low_frequency),
-        RightMotor: rumble_value(step.high_frequency),
-        LeftTrigger: rumble_value(step.left_trigger),
-        RightTrigger: rumble_value(step.right_trigger),
-    }
-}
-
-fn stop_gamepad_vibration(gamepad: &Gamepad) -> windows::core::Result<()> {
-    gamepad.SetVibration(GamepadVibration::default())
-}
-
-fn rumble_value(value: f32) -> f64 {
-    value.clamp(0.0, 1.0) as f64
 }
