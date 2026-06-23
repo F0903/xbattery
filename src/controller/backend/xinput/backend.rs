@@ -87,25 +87,7 @@ impl BatteryBackend for XInputBackend {
     }
 
     fn settled_battery_readings(&self) -> AppResult<Vec<BatteryReading>> {
-        let mut best_readings = Self::battery_readings_once()?;
-        if !should_wait_for_battery_to_settle(&best_readings) {
-            return Ok(best_readings);
-        }
-
-        for _ in 1..BATTERY_SETTLE_ATTEMPTS {
-            thread::sleep(BATTERY_SETTLE_DELAY);
-
-            let readings = Self::battery_readings_once()?;
-            if battery_reading_score(&readings) > battery_reading_score(&best_readings) {
-                best_readings = readings;
-            }
-
-            if !should_wait_for_battery_to_settle(&best_readings) {
-                break;
-            }
-        }
-
-        Ok(best_readings)
+        settle_battery_readings(Self::battery_readings_once, thread::sleep)
     }
 }
 
@@ -144,23 +126,32 @@ fn is_suspicious_battery_reading(reading: &BatteryReading) -> bool {
     )
 }
 
-fn battery_reading_score(readings: &[BatteryReading]) -> u16 {
-    readings.iter().map(single_battery_reading_score).sum()
-}
-
-fn single_battery_reading_score(reading: &BatteryReading) -> u16 {
-    match reading.charge {
-        BatteryCharge::Precise(percent) => percent.into(),
-        BatteryCharge::Coarse(level) => level.estimated_percent().into(),
-        BatteryCharge::Unknown => 0,
+fn settle_battery_readings(
+    mut read_once: impl FnMut() -> AppResult<Vec<BatteryReading>>,
+    mut sleep: impl FnMut(Duration),
+) -> AppResult<Vec<BatteryReading>> {
+    let mut readings = read_once()?;
+    if !should_wait_for_battery_to_settle(&readings) {
+        return Ok(readings);
     }
+
+    for _ in 1..BATTERY_SETTLE_ATTEMPTS {
+        sleep(BATTERY_SETTLE_DELAY);
+
+        readings = read_once()?;
+        if !should_wait_for_battery_to_settle(&readings) {
+            break;
+        }
+    }
+
+    Ok(readings)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::controller::battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading};
 
-    use super::{battery_reading_score, should_wait_for_battery_to_settle};
+    use super::{settle_battery_readings, should_wait_for_battery_to_settle};
 
     #[test]
     fn waits_for_any_low_or_empty_battery_reading_to_settle() {
@@ -179,14 +170,44 @@ mod tests {
     }
 
     #[test]
-    fn battery_reading_score_prefers_higher_total_charge() {
-        assert!(
-            battery_reading_score(&[reading(BatteryLevel::Full), reading(BatteryLevel::Medium)])
-                > battery_reading_score(&[reading(BatteryLevel::Full), reading(BatteryLevel::Low)])
-        );
+    fn settling_returns_first_non_suspicious_reading() {
+        let readings = settle_sequence(vec![
+            vec![reading(BatteryLevel::Empty)],
+            vec![reading(BatteryLevel::Medium)],
+            vec![reading(BatteryLevel::Full)],
+        ]);
+
+        assert_eq!(readings, vec![reading(BatteryLevel::Medium)]);
+    }
+
+    #[test]
+    fn settling_returns_latest_suspicious_reading() {
+        let readings = settle_sequence(vec![
+            vec![reading(BatteryLevel::Low)],
+            vec![reading(BatteryLevel::Empty)],
+        ]);
+
+        assert_eq!(readings, vec![reading(BatteryLevel::Empty)]);
     }
 
     fn reading(level: BatteryLevel) -> BatteryReading {
         BatteryReading::new(BatteryKind::Alkaline, BatteryCharge::Coarse(level))
+    }
+
+    fn settle_sequence(mut sequence: Vec<Vec<BatteryReading>>) -> Vec<BatteryReading> {
+        sequence.reverse();
+        let mut last = sequence.pop().expect("sequence must not be empty");
+
+        settle_battery_readings(
+            || {
+                if let Some(readings) = sequence.pop() {
+                    last = readings;
+                }
+
+                Ok(last.clone())
+            },
+            |_| {},
+        )
+        .unwrap()
     }
 }
