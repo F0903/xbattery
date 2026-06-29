@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::{
     controller::{
         Controller,
@@ -41,7 +43,15 @@ impl ControllerEvent {
             Self::BatteryWarning {
                 current: _,
                 warning,
-            } => Some(policy.notification_for_battery_warning(warning)),
+            } if warning.level().notify() => Some(policy.notification_for_battery_warning(warning)),
+            Self::BatteryWarning { .. } => None,
+        }
+    }
+
+    pub fn sound_file(&self) -> Option<&Path> {
+        match self {
+            Self::BatteryWarning { warning, .. } => warning.level().sound_file(),
+            Self::Connected(_) | Self::Disconnected(_) => None,
         }
     }
 }

@@ -1,4 +1,5 @@
 mod args;
+mod audio;
 mod command;
 #[cfg(debug_assertions)]
 mod diagnostics;
@@ -34,6 +35,7 @@ pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
         Some(Command::CheckUpdate) => update::check(),
         Some(Command::Update { dry_run }) => update::run(dry_run),
         Some(Command::Monitor) => monitor::run(),
+        Some(Command::GenerateSounds) => audio::generate_sounds(),
         #[cfg(debug_assertions)]
         Some(Command::Probe) => diagnostics::probe(),
         #[cfg(debug_assertions)]
@@ -46,6 +48,10 @@ pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
         Some(Command::ToastTestHigh) => toast::test_high(),
         #[cfg(debug_assertions)]
         Some(Command::ToastTestUrgent) => toast::test_urgent(),
+        #[cfg(debug_assertions)]
+        Some(Command::AudioFileTest { path }) => audio::test_file(path),
+        #[cfg(debug_assertions)]
+        Some(Command::ConfigAudioTest) => audio::test_config(),
         #[cfg(debug_assertions)]
         Some(Command::NotificationPreview) => toast::preview(),
     }

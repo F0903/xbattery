@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use crate::controller::battery::BatteryLevel;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -7,6 +9,7 @@ pub struct BatteryWarningLevel {
     coarse_level: Option<BatteryLevel>,
     notify: bool,
     urgent: bool,
+    sound_file: Option<PathBuf>,
 }
 
 impl BatteryWarningLevel {
@@ -16,7 +19,14 @@ impl BatteryWarningLevel {
         coarse_level: Option<BatteryLevel>,
         urgent: bool,
     ) -> Self {
-        Self::with_notify(name, precise_threshold_percent, coarse_level, true, urgent)
+        Self::with_notify_and_file(
+            name,
+            precise_threshold_percent,
+            coarse_level,
+            true,
+            urgent,
+            None,
+        )
     }
 
     pub fn with_notify(
@@ -26,12 +36,31 @@ impl BatteryWarningLevel {
         notify: bool,
         urgent: bool,
     ) -> Self {
+        Self::with_notify_and_file(
+            name,
+            precise_threshold_percent,
+            coarse_level,
+            notify,
+            urgent,
+            None,
+        )
+    }
+
+    pub fn with_notify_and_file(
+        name: impl Into<String>,
+        precise_threshold_percent: Option<u8>,
+        coarse_level: Option<BatteryLevel>,
+        notify: bool,
+        urgent: bool,
+        sound_file: Option<PathBuf>,
+    ) -> Self {
         Self {
             name: name.into(),
             precise_threshold_percent,
             coarse_level,
             notify,
             urgent,
+            sound_file,
         }
     }
 
@@ -90,5 +119,13 @@ impl BatteryWarningLevel {
 
     pub fn urgent(&self) -> bool {
         self.urgent
+    }
+
+    pub fn sound_file(&self) -> Option<&Path> {
+        self.sound_file.as_deref()
+    }
+
+    pub fn has_action(&self) -> bool {
+        self.notify || self.sound_file.is_some()
     }
 }

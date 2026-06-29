@@ -48,9 +48,11 @@ pub(super) fn load_from_path(path: impl AsRef<Path>) -> AppResult<AppConfig> {
     let path = path.as_ref();
     let content = fs::read_to_string(path)
         .map_err(|error| format!("failed to read {}: {}", path.display(), error))?;
-    let config = toml::from_str::<AppConfig>(&content)
+    let mut config = toml::from_str::<AppConfig>(&content)
         .map_err(|error| format!("failed to parse {}: {}", path.display(), error))?;
 
+    config.resolve_relative_paths(path.parent());
     config.validate()?;
+    config.generate_configured_sounds()?;
     Ok(config)
 }

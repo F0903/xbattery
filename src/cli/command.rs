@@ -1,3 +1,6 @@
+#[cfg(debug_assertions)]
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -46,6 +49,9 @@ pub(super) enum Command {
     /// Use GameInput events first, with polling fallback.
     #[command(disable_help_flag = true)]
     Monitor,
+    /// Generate configured WAV sound files and exit.
+    #[command(disable_help_flag = true)]
+    GenerateSounds,
     /// Print XInput and Windows.Gaming.Input battery reports once.
     #[cfg(debug_assertions)]
     #[command(disable_help_flag = true)]
@@ -70,6 +76,14 @@ pub(super) enum Command {
     #[cfg(debug_assertions)]
     #[command(disable_help_flag = true)]
     ToastTestUrgent,
+    /// Play a local WAV file through xbattery's background audio path.
+    #[cfg(debug_assertions)]
+    #[command(disable_help_flag = true)]
+    AudioFileTest { path: PathBuf },
+    /// Play each configured battery level sound in sequence.
+    #[cfg(debug_assertions)]
+    #[command(disable_help_flag = true)]
+    ConfigAudioTest,
     /// Preview production controller notification variants.
     #[cfg(debug_assertions)]
     #[command(disable_help_flag = true)]

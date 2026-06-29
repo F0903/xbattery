@@ -1,6 +1,6 @@
 use std::{sync::mpsc::RecvTimeoutError, thread, time::Duration};
 
-use crate::{AppResult, notifier::Notifier};
+use crate::{AppResult, audio, notifier::Notifier};
 
 use super::{ControllerServiceConfig, run_state::RunState};
 use crate::controller::{
@@ -187,11 +187,26 @@ where
 
     fn notify_events(&self, events: Vec<ControllerEvent>) -> AppResult<()> {
         for event in events {
+            self.play_event_sound(&event);
+
             if let Some(notification) = event.notification(self.config.notification_policy()) {
                 self.notifier.notify(&notification)?;
             }
         }
 
         Ok(())
+    }
+
+    fn play_event_sound(&self, event: &ControllerEvent) {
+        let Some(sound_file) = event.sound_file() else {
+            return;
+        };
+
+        if let Err(error) = audio::play_file(sound_file) {
+            eprintln!(
+                "failed to play configured audio file {}: {error}",
+                sound_file.display()
+            );
+        }
     }
 }

@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
@@ -42,8 +42,20 @@ impl AppConfig {
         load::load_with_source()
     }
 
-    pub fn load_from_path(path: impl AsRef<std::path::Path>) -> AppResult<Self> {
+    pub fn load_from_path(path: impl AsRef<Path>) -> AppResult<Self> {
         load::load_from_path(path)
+    }
+
+    pub(super) fn resolve_relative_paths(&mut self, base_dir: Option<&Path>) {
+        self.battery.resolve_relative_paths(base_dir);
+    }
+
+    pub fn generate_configured_sounds(&self) -> AppResult<Vec<PathBuf>> {
+        self.battery.generate_sounds()
+    }
+
+    pub fn generated_sound_files(&self) -> Vec<PathBuf> {
+        self.battery.generated_sound_files()
     }
 
     pub fn controller_service_config(&self) -> AppResult<ControllerServiceConfig> {

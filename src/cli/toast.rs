@@ -167,7 +167,13 @@ fn warning_label(level: &BatteryWarningLevel, detail: String) -> String {
     } else {
         "high priority"
     };
-    format!("{}: {detail} ({urgency})", level.name())
+    let audio = if level.sound_file().is_some() {
+        ", audio file"
+    } else {
+        ""
+    };
+
+    format!("{}: {detail} ({urgency}{audio})", level.name())
 }
 
 fn sample_controller(battery_source: BackendKind, battery: BatteryReading) -> Controller {

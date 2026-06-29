@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::{
     controller::{
         Controller, ControllerSource,
@@ -115,6 +117,56 @@ fn precise_noncritical_battery_notifications_are_high_priority() {
             .urgency(),
         NotificationUrgency::High
     );
+}
+
+#[test]
+fn battery_warning_notifications_can_be_disabled_per_level() {
+    let event = ControllerEvent::BatteryWarning {
+        current: controller(BatteryCharge::Precise(25)),
+        warning: BatteryWarning::precise(
+            25,
+            BatteryWarningLevel::with_notify_and_file(
+                "low",
+                Some(25),
+                None,
+                false,
+                false,
+                Some("low.wav".into()),
+            ),
+        ),
+    };
+
+    assert_eq!(
+        event.notification(&ControllerNotificationPolicy::default()),
+        None
+    );
+}
+
+#[test]
+fn battery_warning_events_expose_configured_sound_file() {
+    let event = ControllerEvent::BatteryWarning {
+        current: controller(BatteryCharge::Precise(25)),
+        warning: BatteryWarning::precise(
+            25,
+            BatteryWarningLevel::with_notify_and_file(
+                "low",
+                Some(25),
+                None,
+                false,
+                false,
+                Some("low.wav".into()),
+            ),
+        ),
+    };
+
+    assert_eq!(event.sound_file(), Some(Path::new("low.wav")));
+}
+
+#[test]
+fn connectivity_events_do_not_expose_sound_files() {
+    let event = ControllerEvent::Connected(controller(BatteryCharge::Coarse(BatteryLevel::Full)));
+
+    assert_eq!(event.sound_file(), None);
 }
 
 #[test]

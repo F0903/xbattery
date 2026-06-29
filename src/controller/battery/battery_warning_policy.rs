@@ -31,7 +31,7 @@ impl BatteryWarningPolicy {
     fn crossed_precise_threshold(&self, previous: u8, current: u8) -> Option<BatteryWarning> {
         self.levels
             .iter()
-            .filter(|level| level.notify())
+            .filter(|level| level.has_action())
             .filter_map(|level| {
                 level
                     .precise_threshold_percent()
@@ -53,7 +53,7 @@ impl BatteryWarningPolicy {
 
         self.levels
             .iter()
-            .find(|level| level.notify() && level.coarse_level() == Some(current))
+            .find(|level| level.has_action() && level.coarse_level() == Some(current))
             .map(|level| BatteryWarning::coarse(current, level.clone()))
     }
 }
@@ -124,7 +124,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_non_notifying_levels() {
+    fn ignores_levels_without_actions() {
         let policy = BatteryWarningPolicy::new(vec![BatteryWarningLevel::with_notify(
             "full",
             Some(100),
@@ -139,6 +139,38 @@ mod tests {
         );
 
         assert_eq!(warning, None);
+    }
+
+    #[test]
+    fn warns_for_non_notifying_levels_with_sound_file() {
+        let policy = BatteryWarningPolicy::new(vec![BatteryWarningLevel::with_notify_and_file(
+            "low",
+            Some(40),
+            Some(BatteryLevel::Low),
+            false,
+            false,
+            Some("low.wav".into()),
+        )]);
+
+        let warning = policy.warning_between(
+            reading(BatteryCharge::Precise(41)),
+            reading(BatteryCharge::Precise(40)),
+        );
+
+        assert_eq!(
+            warning,
+            Some(BatteryWarning::precise(
+                40,
+                BatteryWarningLevel::with_notify_and_file(
+                    "low",
+                    Some(40),
+                    Some(BatteryLevel::Low),
+                    false,
+                    false,
+                    Some("low.wav".into()),
+                )
+            ))
+        );
     }
 
     fn reading(charge: BatteryCharge) -> BatteryReading {
