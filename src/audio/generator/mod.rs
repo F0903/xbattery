@@ -1,9 +1,13 @@
+mod audio_buffer;
 mod audio_generator;
+mod effect;
+mod envelope;
 mod generated_sound;
 mod generated_sound_effect;
 mod generated_sound_layer;
 mod generated_sound_segment;
 mod generated_sound_waveform;
+mod sample_math;
 mod wav;
 
 pub use audio_generator::AudioGenerator;
