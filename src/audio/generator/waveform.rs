@@ -1,12 +1,12 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum GeneratedSoundWaveform {
+pub enum Waveform {
     Sine,
     Triangle,
     Square,
     Sawtooth,
 }
 
-impl GeneratedSoundWaveform {
+impl Waveform {
     pub(crate) fn sample(self, phase: f32) -> f32 {
         match self {
             Self::Sine => (std::f32::consts::TAU * phase).sin(),

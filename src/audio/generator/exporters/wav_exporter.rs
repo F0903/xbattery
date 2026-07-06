@@ -4,6 +4,7 @@ use std::{
     path::Path,
 };
 
+use super::audio_exporter::AudioExporter;
 use crate::AppResult;
 
 const PCM_FORMAT: u16 = 1;
@@ -12,31 +13,36 @@ const BITS_PER_SAMPLE: u16 = 16;
 const FORMAT_CHUNK_SIZE: u32 = 16;
 const DATA_HEADER_BYTES: usize = 36;
 
-pub(crate) fn write_pcm_wav(path: &Path, sample_rate: u32, samples: &[i16]) -> AppResult<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct WavExporter;
+
+impl AudioExporter for WavExporter {
+    fn export(&self, path: &Path, sample_rate: u32, samples: &[i16]) -> AppResult<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let data_size = samples
+            .len()
+            .checked_mul(size_of::<i16>())
+            .ok_or("generated sound is too large")?;
+        let riff_size = u32::try_from(
+            DATA_HEADER_BYTES
+                .checked_add(data_size)
+                .ok_or("WAV is too large")?,
+        )
+        .map_err(|_| "WAV is too large")?;
+        let data_size = u32::try_from(data_size).map_err(|_| "WAV is too large")?;
+
+        let mut writer = BufWriter::new(File::create(path)?);
+        write_header(&mut writer, sample_rate, riff_size, data_size)?;
+
+        for sample in samples {
+            writer.write_all(&sample.to_le_bytes())?;
+        }
+
+        Ok(())
     }
-
-    let data_size = samples
-        .len()
-        .checked_mul(size_of::<i16>())
-        .ok_or("generated sound is too large")?;
-    let riff_size = u32::try_from(
-        DATA_HEADER_BYTES
-            .checked_add(data_size)
-            .ok_or("WAV is too large")?,
-    )
-    .map_err(|_| "WAV is too large")?;
-    let data_size = u32::try_from(data_size).map_err(|_| "WAV is too large")?;
-
-    let mut writer = BufWriter::new(File::create(path)?);
-    write_header(&mut writer, sample_rate, riff_size, data_size)?;
-
-    for sample in samples {
-        writer.write_all(&sample.to_le_bytes())?;
-    }
-
-    Ok(())
 }
 
 fn write_header(

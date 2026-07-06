@@ -8,8 +8,8 @@ use serde::Deserialize;
 use crate::{
     AppResult,
     audio::{
-        AudioGenerator, DEFAULT_SAMPLE_RATE, GeneratedSound, GeneratedSoundEffect,
-        GeneratedSoundLayer, GeneratedSoundSegment, GeneratedSoundWaveform,
+        AudioEffect, AudioGenerator, AudioLayer, AudioRecipe, AudioSegment, DEFAULT_SAMPLE_RATE,
+        Waveform,
     },
     controller::battery::{BatteryLevel, BatteryWarningLevel},
 };
@@ -29,23 +29,23 @@ pub struct BatteryLevelConfig {
     pub notify: Option<bool>,
     pub urgent: bool,
     pub sound_file: Option<PathBuf>,
-    pub generated_sound: Option<GeneratedSoundConfig>,
+    pub generated_sound: Option<AudioRecipeConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct GeneratedSoundConfig {
+pub struct AudioRecipeConfig {
     pub file: Option<PathBuf>,
     pub sample_rate: Option<u32>,
-    pub segments: Vec<GeneratedSoundSegmentConfig>,
-    pub layers: Vec<GeneratedSoundLayerConfig>,
-    pub effects: Vec<GeneratedSoundEffectConfig>,
+    pub segments: Vec<AudioSegmentConfig>,
+    pub layers: Vec<AudioLayerConfig>,
+    pub effects: Vec<AudioEffectConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct GeneratedSoundSegmentConfig {
-    pub kind: GeneratedSoundSegmentKind,
+pub struct AudioSegmentConfig {
+    pub kind: AudioSegmentKind,
     pub frequencies: Vec<f32>,
     pub duration_seconds: f32,
     pub volume: Option<f32>,
@@ -53,8 +53,8 @@ pub struct GeneratedSoundSegmentConfig {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct GeneratedSoundLayerConfig {
-    pub waveform: GeneratedSoundWaveformConfig,
+pub struct AudioLayerConfig {
+    pub waveform: WaveformConfig,
     pub frequencies: Vec<f32>,
     pub start_seconds: Option<f32>,
     pub duration_seconds: f32,
@@ -67,8 +67,8 @@ pub struct GeneratedSoundLayerConfig {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct GeneratedSoundEffectConfig {
-    pub kind: GeneratedSoundEffectKind,
+pub struct AudioEffectConfig {
+    pub kind: AudioEffectKind,
     pub cutoff_hz: Option<f32>,
     pub delay_seconds: Option<f32>,
     pub feedback: Option<f32>,
@@ -80,7 +80,7 @@ pub struct GeneratedSoundEffectConfig {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum GeneratedSoundSegmentKind {
+pub enum AudioSegmentKind {
     #[default]
     Tone,
     Silence,
@@ -88,7 +88,7 @@ pub enum GeneratedSoundSegmentKind {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum GeneratedSoundWaveformConfig {
+pub enum WaveformConfig {
     #[default]
     Sine,
     Triangle,
@@ -98,7 +98,7 @@ pub enum GeneratedSoundWaveformConfig {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum GeneratedSoundEffectKind {
+pub enum AudioEffectKind {
     #[default]
     Delay,
     LowPass,
@@ -173,8 +173,8 @@ impl BatteryConfig {
             };
 
             let path = sound.file_for_level(name);
-            let generated_sound = sound.generated_sound(name)?;
-            generator.write_wav(&path, &generated_sound)?;
+            let recipe = sound.recipe(name)?;
+            generator.write_wav(&path, &recipe)?;
             generated.push(path);
         }
 
@@ -226,37 +226,37 @@ impl BatteryLevelConfig {
     }
 }
 
-impl GeneratedSoundConfig {
+impl AudioRecipeConfig {
     pub fn file_for_level(&self, name: &str) -> PathBuf {
         self.file
             .clone()
             .unwrap_or_else(|| PathBuf::from("sounds").join(format!("{name}.wav")))
     }
 
-    pub fn generated_sound(&self, level_name: &str) -> AppResult<GeneratedSound> {
+    pub fn recipe(&self, level_name: &str) -> AppResult<AudioRecipe> {
         let sample_rate = self.sample_rate.unwrap_or(DEFAULT_SAMPLE_RATE);
         let effects = self
             .effects
             .iter()
-            .map(GeneratedSoundEffectConfig::effect)
+            .map(AudioEffectConfig::effect)
             .collect::<Vec<_>>();
 
         if !self.layers.is_empty() {
             let layers = self
                 .layers
                 .iter()
-                .map(GeneratedSoundLayerConfig::layer)
+                .map(AudioLayerConfig::layer)
                 .collect::<Vec<_>>();
-            return Ok(GeneratedSound::with_layers(sample_rate, layers, effects));
+            return Ok(AudioRecipe::with_layers(sample_rate, layers, effects));
         }
 
         if !self.segments.is_empty() {
             let segments = self
                 .segments
                 .iter()
-                .map(GeneratedSoundSegmentConfig::segment)
+                .map(AudioSegmentConfig::segment)
                 .collect::<Vec<_>>();
-            return Ok(GeneratedSound::with_segments_and_effects(
+            return Ok(AudioRecipe::with_segments_and_effects(
                 sample_rate,
                 segments,
                 effects,
@@ -270,24 +270,24 @@ impl GeneratedSoundConfig {
     }
 }
 
-impl GeneratedSoundSegmentConfig {
-    pub fn segment(&self) -> GeneratedSoundSegment {
+impl AudioSegmentConfig {
+    pub fn segment(&self) -> AudioSegment {
         match self.kind {
-            GeneratedSoundSegmentKind::Tone => GeneratedSoundSegment::Tone {
+            AudioSegmentKind::Tone => AudioSegment::Tone {
                 frequencies: self.frequencies.clone(),
                 duration_seconds: self.duration_seconds,
                 volume: self.volume.unwrap_or(0.25),
             },
-            GeneratedSoundSegmentKind::Silence => GeneratedSoundSegment::Silence {
+            AudioSegmentKind::Silence => AudioSegment::Silence {
                 duration_seconds: self.duration_seconds,
             },
         }
     }
 }
 
-impl GeneratedSoundLayerConfig {
-    pub fn layer(&self) -> GeneratedSoundLayer {
-        GeneratedSoundLayer::with_decay_envelope(
+impl AudioLayerConfig {
+    pub fn layer(&self) -> AudioLayer {
+        AudioLayer::with_decay_envelope(
             self.waveform.waveform(),
             self.frequencies.clone(),
             self.start_seconds.unwrap_or(0.0),
@@ -301,34 +301,34 @@ impl GeneratedSoundLayerConfig {
     }
 }
 
-impl GeneratedSoundWaveformConfig {
-    pub fn waveform(self) -> GeneratedSoundWaveform {
+impl WaveformConfig {
+    pub fn waveform(self) -> Waveform {
         match self {
-            Self::Sine => GeneratedSoundWaveform::Sine,
-            Self::Triangle => GeneratedSoundWaveform::Triangle,
-            Self::Square => GeneratedSoundWaveform::Square,
-            Self::Sawtooth => GeneratedSoundWaveform::Sawtooth,
+            Self::Sine => Waveform::Sine,
+            Self::Triangle => Waveform::Triangle,
+            Self::Square => Waveform::Square,
+            Self::Sawtooth => Waveform::Sawtooth,
         }
     }
 }
 
-impl GeneratedSoundEffectConfig {
-    pub fn effect(&self) -> GeneratedSoundEffect {
+impl AudioEffectConfig {
+    pub fn effect(&self) -> AudioEffect {
         match self.kind {
-            GeneratedSoundEffectKind::LowPass => GeneratedSoundEffect::LowPass {
+            AudioEffectKind::LowPass => AudioEffect::LowPass {
                 cutoff_hz: self.cutoff_hz.unwrap_or(1_600.0),
             },
-            GeneratedSoundEffectKind::Delay => GeneratedSoundEffect::Delay {
+            AudioEffectKind::Delay => AudioEffect::Delay {
                 delay_seconds: self.delay_seconds.unwrap_or(0.06),
                 feedback: self.feedback.unwrap_or(0.18),
                 mix: self.mix.unwrap_or(0.14),
             },
-            GeneratedSoundEffectKind::Reverb => GeneratedSoundEffect::Reverb {
+            AudioEffectKind::Reverb => AudioEffect::Reverb {
                 room_seconds: self.room_seconds.unwrap_or(0.22),
                 damping: self.damping.unwrap_or(0.42),
                 mix: self.mix.unwrap_or(0.10),
             },
-            GeneratedSoundEffectKind::SoftLimiter => GeneratedSoundEffect::SoftLimiter {
+            AudioEffectKind::SoftLimiter => AudioEffect::SoftLimiter {
                 drive: self.drive.unwrap_or(1.2),
             },
         }

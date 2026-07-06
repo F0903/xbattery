@@ -1,4 +1,4 @@
-use super::generated_sound_waveform::GeneratedSoundWaveform;
+use super::waveform::Waveform;
 
 pub const DEFAULT_ATTACK_SECONDS: f32 = 0.008;
 pub const DEFAULT_DECAY_SECONDS: f32 = 0.0;
@@ -6,8 +6,8 @@ pub const DEFAULT_RELEASE_SECONDS: f32 = 0.028;
 pub const DEFAULT_SUSTAIN_LEVEL: f32 = 1.0;
 
 #[derive(Clone, Debug)]
-pub struct GeneratedSoundLayer {
-    waveform: GeneratedSoundWaveform,
+pub struct AudioLayer {
+    waveform: Waveform,
     frequencies: Vec<f32>,
     start_seconds: f32,
     duration_seconds: f32,
@@ -18,9 +18,9 @@ pub struct GeneratedSoundLayer {
     release_seconds: f32,
 }
 
-impl GeneratedSoundLayer {
+impl AudioLayer {
     pub fn new(
-        waveform: GeneratedSoundWaveform,
+        waveform: Waveform,
         frequencies: Vec<f32>,
         start_seconds: f32,
         duration_seconds: f32,
@@ -40,7 +40,7 @@ impl GeneratedSoundLayer {
     }
 
     pub fn with_envelope(
-        waveform: GeneratedSoundWaveform,
+        waveform: Waveform,
         frequencies: Vec<f32>,
         start_seconds: f32,
         duration_seconds: f32,
@@ -62,7 +62,7 @@ impl GeneratedSoundLayer {
     }
 
     pub fn with_decay_envelope(
-        waveform: GeneratedSoundWaveform,
+        waveform: Waveform,
         frequencies: Vec<f32>,
         start_seconds: f32,
         duration_seconds: f32,
@@ -85,7 +85,7 @@ impl GeneratedSoundLayer {
         }
     }
 
-    pub(crate) fn waveform(&self) -> GeneratedSoundWaveform {
+    pub(crate) fn waveform(&self) -> Waveform {
         self.waveform
     }
 
@@ -105,23 +105,28 @@ impl GeneratedSoundLayer {
         self.volume
     }
 
-    pub(crate) fn attack_seconds(&self) -> f32 {
-        self.attack_seconds
-    }
-
-    pub(crate) fn decay_seconds(&self) -> f32 {
-        self.decay_seconds
-    }
-
-    pub(crate) fn sustain_level(&self) -> f32 {
-        self.sustain_level
-    }
-
-    pub(crate) fn release_seconds(&self) -> f32 {
-        self.release_seconds
-    }
-
     pub(crate) fn end_seconds(&self) -> f32 {
         self.start_seconds + self.duration_seconds
+    }
+
+    pub(crate) fn amplitude_at(&self, elapsed_seconds: f32) -> f32 {
+        let body = if self.attack_seconds > 0.0 && elapsed_seconds < self.attack_seconds {
+            elapsed_seconds / self.attack_seconds
+        } else if self.decay_seconds > 0.0 {
+            let decay_progress =
+                ((elapsed_seconds - self.attack_seconds).max(0.0) / self.decay_seconds).min(1.0);
+            let decay_curve = 1.0 - (-5.0 * decay_progress).exp();
+            1.0 - (1.0 - self.sustain_level) * decay_curve
+        } else {
+            1.0
+        };
+
+        let release = if self.release_seconds <= 0.0 {
+            1.0
+        } else {
+            ((self.duration_seconds - elapsed_seconds) / self.release_seconds).min(1.0)
+        };
+
+        (body * release).clamp(0.0, 1.0)
     }
 }

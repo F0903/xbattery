@@ -1,41 +1,40 @@
 use super::{
-    generated_sound_effect::GeneratedSoundEffect, generated_sound_layer::GeneratedSoundLayer,
-    generated_sound_segment::GeneratedSoundSegment,
-    generated_sound_waveform::GeneratedSoundWaveform,
+    audio_effect::AudioEffect, audio_layer::AudioLayer, audio_segment::AudioSegment,
+    waveform::Waveform,
 };
 
 pub const DEFAULT_SAMPLE_RATE: u32 = 44_100;
 
 #[derive(Clone, Debug)]
-pub struct GeneratedSound {
+pub struct AudioRecipe {
     sample_rate: u32,
     duration_seconds: f32,
-    layers: Vec<GeneratedSoundLayer>,
-    effects: Vec<GeneratedSoundEffect>,
+    layers: Vec<AudioLayer>,
+    effects: Vec<AudioEffect>,
 }
 
-impl GeneratedSound {
-    pub fn new(sample_rate: u32, segments: Vec<GeneratedSoundSegment>) -> Self {
+impl AudioRecipe {
+    pub fn new(sample_rate: u32, segments: Vec<AudioSegment>) -> Self {
         Self::with_segments_and_effects(sample_rate, segments, Vec::new())
     }
 
     pub fn with_segments_and_effects(
         sample_rate: u32,
-        segments: Vec<GeneratedSoundSegment>,
-        effects: Vec<GeneratedSoundEffect>,
+        segments: Vec<AudioSegment>,
+        effects: Vec<AudioEffect>,
     ) -> Self {
         let mut cursor_seconds = 0.0;
         let mut layers = Vec::new();
 
         for segment in segments {
             match segment {
-                GeneratedSoundSegment::Tone {
+                AudioSegment::Tone {
                     frequencies,
                     duration_seconds,
                     volume,
                 } => {
-                    layers.push(GeneratedSoundLayer::new(
-                        GeneratedSoundWaveform::Sine,
+                    layers.push(AudioLayer::new(
+                        Waveform::Sine,
                         frequencies,
                         cursor_seconds,
                         duration_seconds,
@@ -43,7 +42,7 @@ impl GeneratedSound {
                     ));
                     cursor_seconds += duration_seconds;
                 }
-                GeneratedSoundSegment::Silence { duration_seconds } => {
+                AudioSegment::Silence { duration_seconds } => {
                     cursor_seconds += duration_seconds;
                 }
             }
@@ -54,12 +53,12 @@ impl GeneratedSound {
 
     pub fn with_layers(
         sample_rate: u32,
-        layers: Vec<GeneratedSoundLayer>,
-        effects: Vec<GeneratedSoundEffect>,
+        layers: Vec<AudioLayer>,
+        effects: Vec<AudioEffect>,
     ) -> Self {
         let duration_seconds = layers
             .iter()
-            .map(GeneratedSoundLayer::end_seconds)
+            .map(AudioLayer::end_seconds)
             .fold(0.0, f32::max);
 
         Self::with_duration(sample_rate, duration_seconds, layers, effects)
@@ -73,24 +72,19 @@ impl GeneratedSound {
         self.duration_seconds
     }
 
-    pub(crate) fn layers(&self) -> &[GeneratedSoundLayer] {
+    pub(crate) fn layers(&self) -> &[AudioLayer] {
         &self.layers
     }
 
-    pub(crate) fn effects(&self) -> &[GeneratedSoundEffect] {
+    pub(crate) fn effects(&self) -> &[AudioEffect] {
         &self.effects
-    }
-
-    #[cfg(test)]
-    pub(crate) fn samples(&self) -> Vec<i16> {
-        super::audio_generator::AudioGenerator::new().samples(self)
     }
 
     fn with_duration(
         sample_rate: u32,
         duration_seconds: f32,
-        layers: Vec<GeneratedSoundLayer>,
-        effects: Vec<GeneratedSoundEffect>,
+        layers: Vec<AudioLayer>,
+        effects: Vec<AudioEffect>,
     ) -> Self {
         Self {
             sample_rate,

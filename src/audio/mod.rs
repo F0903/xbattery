@@ -2,7 +2,7 @@ mod generator;
 mod playback;
 
 pub use generator::{
-    AudioGenerator, DEFAULT_SAMPLE_RATE, GeneratedSound, GeneratedSoundEffect, GeneratedSoundLayer,
-    GeneratedSoundSegment, GeneratedSoundWaveform,
+    AudioEffect, AudioGenerator, AudioLayer, AudioRecipe, AudioSegment, DEFAULT_SAMPLE_RATE,
+    Waveform,
 };
 pub use playback::{play_file, play_file_blocking};

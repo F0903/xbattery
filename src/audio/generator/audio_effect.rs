@@ -1,5 +1,5 @@
 #[derive(Clone, Debug)]
-pub enum GeneratedSoundEffect {
+pub enum AudioEffect {
     LowPass {
         cutoff_hz: f32,
     },

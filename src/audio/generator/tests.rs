@@ -1,8 +1,8 @@
 use std::{fs, path::PathBuf, time::SystemTime};
 
 use super::{
-    AudioGenerator, DEFAULT_SAMPLE_RATE, GeneratedSound, GeneratedSoundEffect, GeneratedSoundLayer,
-    GeneratedSoundSegment, GeneratedSoundWaveform,
+    AudioEffect, AudioGenerator, AudioLayer, AudioRecipe, AudioSegment, DEFAULT_SAMPLE_RATE,
+    Waveform,
 };
 
 #[test]
@@ -12,9 +12,9 @@ fn writes_wav_file() {
     AudioGenerator::new()
         .write_wav(
             &path,
-            &GeneratedSound::new(
+            &AudioRecipe::new(
                 DEFAULT_SAMPLE_RATE,
-                vec![GeneratedSoundSegment::Tone {
+                vec![AudioSegment::Tone {
                     frequencies: vec![440.0],
                     duration_seconds: 0.1,
                     volume: 0.25,
@@ -38,11 +38,11 @@ fn writes_layered_wav_file() {
     AudioGenerator::new()
         .write_wav(
             &path,
-            &GeneratedSound::with_layers(
+            &AudioRecipe::with_layers(
                 DEFAULT_SAMPLE_RATE,
                 vec![
-                    GeneratedSoundLayer::with_decay_envelope(
-                        GeneratedSoundWaveform::Sine,
+                    AudioLayer::with_decay_envelope(
+                        Waveform::Sine,
                         vec![440.0],
                         0.0,
                         0.12,
@@ -52,8 +52,8 @@ fn writes_layered_wav_file() {
                         0.1,
                         0.04,
                     ),
-                    GeneratedSoundLayer::with_decay_envelope(
-                        GeneratedSoundWaveform::Triangle,
+                    AudioLayer::with_decay_envelope(
+                        Waveform::Triangle,
                         vec![880.0],
                         0.02,
                         0.08,
@@ -65,18 +65,18 @@ fn writes_layered_wav_file() {
                     ),
                 ],
                 vec![
-                    GeneratedSoundEffect::LowPass { cutoff_hz: 1400.0 },
-                    GeneratedSoundEffect::Delay {
+                    AudioEffect::LowPass { cutoff_hz: 1400.0 },
+                    AudioEffect::Delay {
                         delay_seconds: 0.04,
                         feedback: 0.15,
                         mix: 0.12,
                     },
-                    GeneratedSoundEffect::Reverb {
+                    AudioEffect::Reverb {
                         room_seconds: 0.18,
                         damping: 0.45,
                         mix: 0.10,
                     },
-                    GeneratedSoundEffect::SoftLimiter { drive: 1.2 },
+                    AudioEffect::SoftLimiter { drive: 1.2 },
                 ],
             ),
         )
@@ -92,22 +92,24 @@ fn writes_layered_wav_file() {
 
 #[test]
 fn reverb_adds_audible_tail_after_dry_sound() {
-    let segments = vec![GeneratedSoundSegment::Tone {
+    let generator = AudioGenerator::new();
+    let segments = vec![AudioSegment::Tone {
         frequencies: vec![440.0],
         duration_seconds: 0.08,
         volume: 0.25,
     }];
-    let dry_samples = GeneratedSound::new(DEFAULT_SAMPLE_RATE, segments.clone()).samples();
-    let wet_samples = GeneratedSound::with_segments_and_effects(
+    let dry_sound = AudioRecipe::new(DEFAULT_SAMPLE_RATE, segments.clone());
+    let wet_sound = AudioRecipe::with_segments_and_effects(
         DEFAULT_SAMPLE_RATE,
         segments,
-        vec![GeneratedSoundEffect::Reverb {
+        vec![AudioEffect::Reverb {
             room_seconds: 0.24,
             damping: 0.20,
             mix: 0.65,
         }],
-    )
-    .samples();
+    );
+    let dry_samples = generator.samples(&dry_sound);
+    let wet_samples = generator.samples(&wet_sound);
 
     let tail_peak = wet_samples[dry_samples.len()..]
         .iter()

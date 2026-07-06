@@ -1,5 +1,5 @@
 #[derive(Clone, Debug)]
-pub enum GeneratedSoundSegment {
+pub enum AudioSegment {
     Tone {
         frequencies: Vec<f32>,
         duration_seconds: f32,

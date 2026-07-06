@@ -3,8 +3,7 @@ use std::{collections::HashSet, path::Path};
 use super::{
     AppConfig,
     battery_config::{
-        GeneratedSoundEffectConfig, GeneratedSoundEffectKind, GeneratedSoundLayerConfig,
-        GeneratedSoundSegmentConfig, GeneratedSoundSegmentKind,
+        AudioEffectConfig, AudioEffectKind, AudioLayerConfig, AudioSegmentConfig, AudioSegmentKind,
     },
 };
 use crate::AppResult;
@@ -157,7 +156,7 @@ fn validate_sound_file(field_path: &str, sound_file: &Path) -> AppResult<()> {
 fn validate_generated_sound(
     level_path: &str,
     name: &str,
-    sound: &super::battery_config::GeneratedSoundConfig,
+    sound: &super::battery_config::AudioRecipeConfig,
 ) -> AppResult<()> {
     let sound_path = format!("{level_path}.generated_sound");
     let file = sound.file_for_level(name);
@@ -178,24 +177,24 @@ fn validate_generated_sound(
     }
 
     for (index, segment) in sound.segments.iter().enumerate() {
-        validate_generated_sound_segment(&sound_path, index, segment)?;
+        validate_audio_segment(&sound_path, index, segment)?;
     }
 
     for (index, layer) in sound.layers.iter().enumerate() {
-        validate_generated_sound_layer(&sound_path, index, layer)?;
+        validate_audio_layer(&sound_path, index, layer)?;
     }
 
     for (index, effect) in sound.effects.iter().enumerate() {
-        validate_generated_sound_effect(&sound_path, index, effect)?;
+        validate_audio_effect(&sound_path, index, effect)?;
     }
 
     Ok(())
 }
 
-fn validate_generated_sound_segment(
+fn validate_audio_segment(
     sound_path: &str,
     index: usize,
-    segment: &GeneratedSoundSegmentConfig,
+    segment: &AudioSegmentConfig,
 ) -> AppResult<()> {
     let segment_path = format!("{sound_path}.segments[{index}]");
 
@@ -208,7 +207,7 @@ fn validate_generated_sound_segment(
         validate_unit_interval(&format!("{segment_path}.volume"), volume, false)?;
     }
 
-    if segment.kind == GeneratedSoundSegmentKind::Tone {
+    if segment.kind == AudioSegmentKind::Tone {
         if segment.frequencies.is_empty() {
             return Err(format!("{segment_path}.frequencies must not be empty").into());
         }
@@ -219,11 +218,7 @@ fn validate_generated_sound_segment(
     Ok(())
 }
 
-fn validate_generated_sound_layer(
-    sound_path: &str,
-    index: usize,
-    layer: &GeneratedSoundLayerConfig,
-) -> AppResult<()> {
+fn validate_audio_layer(sound_path: &str, index: usize, layer: &AudioLayerConfig) -> AppResult<()> {
     let layer_path = format!("{sound_path}.layers[{index}]");
 
     if layer.frequencies.is_empty() {
@@ -266,15 +261,15 @@ fn validate_generated_sound_layer(
     Ok(())
 }
 
-fn validate_generated_sound_effect(
+fn validate_audio_effect(
     sound_path: &str,
     index: usize,
-    effect: &GeneratedSoundEffectConfig,
+    effect: &AudioEffectConfig,
 ) -> AppResult<()> {
     let effect_path = format!("{sound_path}.effects[{index}]");
 
     match effect.kind {
-        GeneratedSoundEffectKind::LowPass => {
+        AudioEffectKind::LowPass => {
             if effect.delay_seconds.is_some()
                 || effect.feedback.is_some()
                 || effect.room_seconds.is_some()
@@ -294,7 +289,7 @@ fn validate_generated_sound_effect(
                 return Err(format!("{effect_path}.cutoff_hz must be between 80 and 20000").into());
             }
         }
-        GeneratedSoundEffectKind::Delay => {
+        AudioEffectKind::Delay => {
             if effect.cutoff_hz.is_some() {
                 return Err(format!("{effect_path}.cutoff_hz is only valid for low_pass").into());
             }
@@ -327,7 +322,7 @@ fn validate_generated_sound_effect(
                 validate_unit_interval(&format!("{effect_path}.mix"), mix, true)?;
             }
         }
-        GeneratedSoundEffectKind::Reverb => {
+        AudioEffectKind::Reverb => {
             if effect.cutoff_hz.is_some()
                 || effect.delay_seconds.is_some()
                 || effect.feedback.is_some()
@@ -356,7 +351,7 @@ fn validate_generated_sound_effect(
                 validate_unit_interval(&format!("{effect_path}.mix"), mix, true)?;
             }
         }
-        GeneratedSoundEffectKind::SoftLimiter => {
+        AudioEffectKind::SoftLimiter => {
             if effect.cutoff_hz.is_some()
                 || effect.delay_seconds.is_some()
                 || effect.feedback.is_some()
