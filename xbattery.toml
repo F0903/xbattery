@@ -15,13 +15,13 @@ threshold_percent = 70
 coarse_level = "medium"
 notify = true
 urgent = false
-generated_sound.layers = [
-    { waveform = "sine", frequencies = [523.25, 526.0, 659.25], start_seconds = 0.0, duration_seconds = 0.24, volume = 0.155, attack_seconds = 0.018, decay_seconds = 0.120, sustain_level = 0.32, release_seconds = 0.110 },
-    { waveform = "sine", frequencies = [261.63, 263.0, 329.63], start_seconds = 0.0, duration_seconds = 0.34, volume = 0.085, attack_seconds = 0.022, decay_seconds = 0.180, sustain_level = 0.38, release_seconds = 0.140 },
-    { waveform = "sine", frequencies = [1046.5, 1051.0], start_seconds = 0.018, duration_seconds = 0.18, volume = 0.034, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.18, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.205, duration_seconds = 0.26, volume = 0.135, attack_seconds = 0.018, decay_seconds = 0.130, sustain_level = 0.30, release_seconds = 0.120 },
-    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.205, duration_seconds = 0.36, volume = 0.075, attack_seconds = 0.024, decay_seconds = 0.190, sustain_level = 0.34, release_seconds = 0.150 },
-    { waveform = "sine", frequencies = [1318.51, 1325.0], start_seconds = 0.223, duration_seconds = 0.18, volume = 0.028, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.16, release_seconds = 0.080 },
+generated_sound.roll = [
+    { notes = "C5 C5+9.07c E5", at = 0.0, length = 0.24, gain = 0.155, adsr = [0.018, 0.120, 0.32, 0.110] },
+    { notes = "C4 C4+9.07c E4", at = 0.0, length = 0.34, gain = 0.085, adsr = [0.022, 0.180, 0.38, 0.140] },
+    { notes = "C6 C6+7.42c", at = 0.018, length = 0.18, gain = 0.034, adsr = [0.012, 0.080, 0.18, 0.080] },
+    { notes = "E5 E5+8.50c G5", at = 0.205, length = 0.26, gain = 0.135, adsr = [0.018, 0.130, 0.30, 0.120] },
+    { notes = "E4 E4+7.19c G4", at = 0.205, length = 0.36, gain = 0.075, adsr = [0.024, 0.190, 0.34, 0.150] },
+    { notes = "E6 E6+8.50c", at = 0.223, length = 0.18, gain = 0.028, adsr = [0.012, 0.080, 0.16, 0.080] },
 ]
 generated_sound.effects = [
     { kind = "low_pass", cutoff_hz = 6800.0 },
@@ -35,16 +35,16 @@ threshold_percent = 40
 coarse_level = "low"
 notify = true
 urgent = false
-generated_sound.layers = [
-    { waveform = "sine", frequencies = [523.25, 526.0, 659.25], start_seconds = 0.0, duration_seconds = 0.24, volume = 0.160, attack_seconds = 0.018, decay_seconds = 0.120, sustain_level = 0.32, release_seconds = 0.110 },
-    { waveform = "sine", frequencies = [261.63, 263.0, 329.63], start_seconds = 0.0, duration_seconds = 0.35, volume = 0.090, attack_seconds = 0.022, decay_seconds = 0.185, sustain_level = 0.38, release_seconds = 0.145 },
-    { waveform = "sine", frequencies = [1046.5, 1051.0], start_seconds = 0.018, duration_seconds = 0.18, volume = 0.036, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.18, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.205, duration_seconds = 0.26, volume = 0.145, attack_seconds = 0.018, decay_seconds = 0.130, sustain_level = 0.30, release_seconds = 0.120 },
-    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.205, duration_seconds = 0.37, volume = 0.082, attack_seconds = 0.024, decay_seconds = 0.195, sustain_level = 0.34, release_seconds = 0.155 },
-    { waveform = "sine", frequencies = [1318.51, 1325.0], start_seconds = 0.223, duration_seconds = 0.18, volume = 0.030, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.16, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.455, duration_seconds = 0.32, volume = 0.150, attack_seconds = 0.020, decay_seconds = 0.160, sustain_level = 0.28, release_seconds = 0.145 },
-    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.455, duration_seconds = 0.45, volume = 0.092, attack_seconds = 0.030, decay_seconds = 0.235, sustain_level = 0.34, release_seconds = 0.180 },
-    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.478, duration_seconds = 0.22, volume = 0.032, attack_seconds = 0.014, decay_seconds = 0.095, sustain_level = 0.14, release_seconds = 0.090 },
+generated_sound.roll = [
+    { notes = "C5 C5+9.07c E5", at = 0.0, length = 0.24, gain = 0.160, adsr = [0.018, 0.120, 0.32, 0.110] },
+    { notes = "C4 C4+9.07c E4", at = 0.0, length = 0.35, gain = 0.090, adsr = [0.022, 0.185, 0.38, 0.145] },
+    { notes = "C6 C6+7.42c", at = 0.018, length = 0.18, gain = 0.036, adsr = [0.012, 0.080, 0.18, 0.080] },
+    { notes = "E5 E5+8.50c G5", at = 0.205, length = 0.26, gain = 0.145, adsr = [0.018, 0.130, 0.30, 0.120] },
+    { notes = "E4 E4+7.19c G4", at = 0.205, length = 0.37, gain = 0.082, adsr = [0.024, 0.195, 0.34, 0.155] },
+    { notes = "E6 E6+8.50c", at = 0.223, length = 0.18, gain = 0.030, adsr = [0.012, 0.080, 0.16, 0.080] },
+    { notes = "G4 G4+8.83c B4", at = 0.455, length = 0.32, gain = 0.150, adsr = [0.020, 0.160, 0.28, 0.145] },
+    { notes = "G3 G3+8.83c B3", at = 0.455, length = 0.45, gain = 0.092, adsr = [0.030, 0.235, 0.34, 0.180] },
+    { notes = "G5 G5+13.22c", at = 0.478, length = 0.22, gain = 0.032, adsr = [0.014, 0.095, 0.14, 0.090] },
 ]
 generated_sound.effects = [
     { kind = "low_pass", cutoff_hz = 6800.0 },
@@ -58,16 +58,16 @@ threshold_percent = 10
 coarse_level = "empty"
 notify = true
 urgent = true
-generated_sound.layers = [
-    { waveform = "sine", frequencies = [987.77, 992.0, 1318.51], start_seconds = 0.0, duration_seconds = 0.15, volume = 0.150, attack_seconds = 0.010, decay_seconds = 0.070, sustain_level = 0.18, release_seconds = 0.070 },
-    { waveform = "sine", frequencies = [493.88, 496.0, 659.25], start_seconds = 0.0, duration_seconds = 0.23, volume = 0.092, attack_seconds = 0.016, decay_seconds = 0.120, sustain_level = 0.28, release_seconds = 0.095 },
-    { waveform = "sine", frequencies = [1760.0, 1768.0], start_seconds = 0.010, duration_seconds = 0.10, volume = 0.026, attack_seconds = 0.006, decay_seconds = 0.040, sustain_level = 0.08, release_seconds = 0.045 },
-    { waveform = "sine", frequencies = [739.99, 744.0, 987.77], start_seconds = 0.175, duration_seconds = 0.16, volume = 0.165, attack_seconds = 0.010, decay_seconds = 0.076, sustain_level = 0.18, release_seconds = 0.074 },
-    { waveform = "sine", frequencies = [369.99, 372.0, 493.88], start_seconds = 0.175, duration_seconds = 0.25, volume = 0.100, attack_seconds = 0.017, decay_seconds = 0.130, sustain_level = 0.28, release_seconds = 0.105 },
-    { waveform = "sine", frequencies = [1479.98, 1488.0], start_seconds = 0.188, duration_seconds = 0.11, volume = 0.030, attack_seconds = 0.006, decay_seconds = 0.043, sustain_level = 0.08, release_seconds = 0.045 },
-    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.390, duration_seconds = 0.24, volume = 0.205, attack_seconds = 0.016, decay_seconds = 0.120, sustain_level = 0.22, release_seconds = 0.110 },
-    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.390, duration_seconds = 0.36, volume = 0.132, attack_seconds = 0.024, decay_seconds = 0.190, sustain_level = 0.34, release_seconds = 0.150 },
-    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.410, duration_seconds = 0.16, volume = 0.038, attack_seconds = 0.010, decay_seconds = 0.062, sustain_level = 0.10, release_seconds = 0.065 },
+generated_sound.roll = [
+    { notes = "B5 B5+7.40c E6", at = 0.0, length = 0.15, gain = 0.150, adsr = [0.010, 0.070, 0.18, 0.070] },
+    { notes = "B4 B4+7.40c E5", at = 0.0, length = 0.23, gain = 0.092, adsr = [0.016, 0.120, 0.28, 0.095] },
+    { notes = "A6 A6+7.85c", at = 0.010, length = 0.10, gain = 0.026, adsr = [0.006, 0.040, 0.08, 0.045] },
+    { notes = "F#5 F#5+9.36c B5", at = 0.175, length = 0.16, gain = 0.165, adsr = [0.010, 0.076, 0.18, 0.074] },
+    { notes = "F#4 F#4+9.36c B4", at = 0.175, length = 0.25, gain = 0.100, adsr = [0.017, 0.130, 0.28, 0.105] },
+    { notes = "F#6 F#6+9.36c", at = 0.188, length = 0.11, gain = 0.030, adsr = [0.006, 0.043, 0.08, 0.045] },
+    { notes = "G4 G4+8.83c B4", at = 0.390, length = 0.24, gain = 0.205, adsr = [0.016, 0.120, 0.22, 0.110] },
+    { notes = "G3 G3+8.83c B3", at = 0.390, length = 0.36, gain = 0.132, adsr = [0.024, 0.190, 0.34, 0.150] },
+    { notes = "G5 G5+13.22c", at = 0.410, length = 0.16, gain = 0.038, adsr = [0.010, 0.062, 0.10, 0.065] },
 ]
 generated_sound.effects = [
     { kind = "low_pass", cutoff_hz = 6800.0 },

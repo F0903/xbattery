@@ -60,135 +60,53 @@ After install, edit:
 
 The background monitor watches this file and applies valid changes automatically. If a save leaves the file invalid, xbattery keeps using the last valid config until the file is fixed.
 
-Common options:
+Here is a small piano-roll-style warning sound:
 
 ```toml
-[monitor]
-poll_interval_seconds = 60
-
-[battery.levels.full]
-threshold_percent = 100
-coarse_level = "full"
-notify = false
-urgent = false
-
-[battery.levels.medium]
-threshold_percent = 70
-coarse_level = "medium"
-notify = true
-urgent = false
-
-generated_sound.layers = [
-    { waveform = "sine", frequencies = [523.25, 526.0, 659.25], start_seconds = 0.0, duration_seconds = 0.24, volume = 0.155, attack_seconds = 0.018, decay_seconds = 0.120, sustain_level = 0.32, release_seconds = 0.110 },
-    { waveform = "sine", frequencies = [261.63, 263.0, 329.63], start_seconds = 0.0, duration_seconds = 0.34, volume = 0.085, attack_seconds = 0.022, decay_seconds = 0.180, sustain_level = 0.38, release_seconds = 0.140 },
-    { waveform = "sine", frequencies = [1046.5, 1051.0], start_seconds = 0.018, duration_seconds = 0.18, volume = 0.034, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.18, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.205, duration_seconds = 0.26, volume = 0.135, attack_seconds = 0.018, decay_seconds = 0.130, sustain_level = 0.30, release_seconds = 0.120 },
-    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.205, duration_seconds = 0.36, volume = 0.075, attack_seconds = 0.024, decay_seconds = 0.190, sustain_level = 0.34, release_seconds = 0.150 },
-    { waveform = "sine", frequencies = [1318.51, 1325.0], start_seconds = 0.223, duration_seconds = 0.18, volume = 0.028, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.16, release_seconds = 0.080 },
-]
-generated_sound.effects = [
-    { kind = "low_pass", cutoff_hz = 6800.0 },
-    { kind = "delay", delay_seconds = 0.105, feedback = 0.08, mix = 0.045 },
-    { kind = "reverb", room_seconds = 0.24, damping = 0.62, mix = 0.10 },
-    { kind = "soft_limiter", drive = 1.04 },
-]
-
 [battery.levels.low]
 threshold_percent = 40
 coarse_level = "low"
 notify = true
-urgent = false
 
-generated_sound.layers = [
-    { waveform = "sine", frequencies = [523.25, 526.0, 659.25], start_seconds = 0.0, duration_seconds = 0.24, volume = 0.160, attack_seconds = 0.018, decay_seconds = 0.120, sustain_level = 0.32, release_seconds = 0.110 },
-    { waveform = "sine", frequencies = [261.63, 263.0, 329.63], start_seconds = 0.0, duration_seconds = 0.35, volume = 0.090, attack_seconds = 0.022, decay_seconds = 0.185, sustain_level = 0.38, release_seconds = 0.145 },
-    { waveform = "sine", frequencies = [1046.5, 1051.0], start_seconds = 0.018, duration_seconds = 0.18, volume = 0.036, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.18, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.205, duration_seconds = 0.26, volume = 0.145, attack_seconds = 0.018, decay_seconds = 0.130, sustain_level = 0.30, release_seconds = 0.120 },
-    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.205, duration_seconds = 0.37, volume = 0.082, attack_seconds = 0.024, decay_seconds = 0.195, sustain_level = 0.34, release_seconds = 0.155 },
-    { waveform = "sine", frequencies = [1318.51, 1325.0], start_seconds = 0.223, duration_seconds = 0.18, volume = 0.030, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.16, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.455, duration_seconds = 0.32, volume = 0.150, attack_seconds = 0.020, decay_seconds = 0.160, sustain_level = 0.28, release_seconds = 0.145 },
-    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.455, duration_seconds = 0.45, volume = 0.092, attack_seconds = 0.030, decay_seconds = 0.235, sustain_level = 0.34, release_seconds = 0.180 },
-    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.478, duration_seconds = 0.22, volume = 0.032, attack_seconds = 0.014, decay_seconds = 0.095, sustain_level = 0.14, release_seconds = 0.090 },
+generated_sound.roll = [
+    { notes = "C5 E5 G5", at = 0.0, length = 0.20, gain = 0.18 },
+    { notes = "G5 B5 D6", at = 0.22, length = 0.24, gain = 0.16 },
 ]
 generated_sound.effects = [
-    { kind = "low_pass", cutoff_hz = 6800.0 },
-    { kind = "delay", delay_seconds = 0.105, feedback = 0.08, mix = 0.050 },
-    { kind = "reverb", room_seconds = 0.26, damping = 0.62, mix = 0.11 },
-    { kind = "soft_limiter", drive = 1.05 },
+    { kind = "reverb", room_seconds = 0.20, damping = 0.50, mix = 0.10 },
+    { kind = "soft_limiter", drive = 1.1 },
 ]
-
-[battery.levels.empty]
-threshold_percent = 10
-coarse_level = "empty"
-notify = true
-urgent = true
-
-generated_sound.layers = [
-    { waveform = "sine", frequencies = [987.77, 992.0, 1318.51], start_seconds = 0.0, duration_seconds = 0.15, volume = 0.150, attack_seconds = 0.010, decay_seconds = 0.070, sustain_level = 0.18, release_seconds = 0.070 },
-    { waveform = "sine", frequencies = [493.88, 496.0, 659.25], start_seconds = 0.0, duration_seconds = 0.23, volume = 0.092, attack_seconds = 0.016, decay_seconds = 0.120, sustain_level = 0.28, release_seconds = 0.095 },
-    { waveform = "sine", frequencies = [1760.0, 1768.0], start_seconds = 0.010, duration_seconds = 0.10, volume = 0.026, attack_seconds = 0.006, decay_seconds = 0.040, sustain_level = 0.08, release_seconds = 0.045 },
-    { waveform = "sine", frequencies = [739.99, 744.0, 987.77], start_seconds = 0.175, duration_seconds = 0.16, volume = 0.165, attack_seconds = 0.010, decay_seconds = 0.076, sustain_level = 0.18, release_seconds = 0.074 },
-    { waveform = "sine", frequencies = [369.99, 372.0, 493.88], start_seconds = 0.175, duration_seconds = 0.25, volume = 0.100, attack_seconds = 0.017, decay_seconds = 0.130, sustain_level = 0.28, release_seconds = 0.105 },
-    { waveform = "sine", frequencies = [1479.98, 1488.0], start_seconds = 0.188, duration_seconds = 0.11, volume = 0.030, attack_seconds = 0.006, decay_seconds = 0.043, sustain_level = 0.08, release_seconds = 0.045 },
-    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.390, duration_seconds = 0.24, volume = 0.205, attack_seconds = 0.016, decay_seconds = 0.120, sustain_level = 0.22, release_seconds = 0.110 },
-    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.390, duration_seconds = 0.36, volume = 0.132, attack_seconds = 0.024, decay_seconds = 0.190, sustain_level = 0.34, release_seconds = 0.150 },
-    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.410, duration_seconds = 0.16, volume = 0.038, attack_seconds = 0.010, decay_seconds = 0.062, sustain_level = 0.10, release_seconds = 0.065 },
-]
-generated_sound.effects = [
-    { kind = "low_pass", cutoff_hz = 6800.0 },
-    { kind = "delay", delay_seconds = 0.072, feedback = 0.05, mix = 0.035 },
-    { kind = "reverb", room_seconds = 0.18, damping = 0.62, mix = 0.10 },
-    { kind = "soft_limiter", drive = 1.08 },
-]
-
-[notifications]
-notify_connected = true
-notify_disconnected = true
-
-[updates]
-repo_owner = "F0903"
-repo_name = "xbattery"
-asset_identifier = "xbattery"
-bin_path_in_archive = "xbattery.exe"
-check_automatically = true
-check_interval_hours = 24
-auto_install = false
-notify_available = true
 ```
+
+See the bundled `xbattery.toml` for a complete configuration.
 
 Set `notify_connected` or `notify_disconnected` to `false` if you only want battery warnings.
 
 Each battery level can match precise battery APIs with `threshold_percent`, coarse battery APIs with `coarse_level`, or both. Set `notify = true` for levels that should show a battery warning toast, and `urgent = true` for levels that should request urgent Windows toast delivery.
 
-Use `generated_sound.layers` to have xbattery build an in-memory audio clip when the monitor configuration is applied, then play that clip when the level is reached. Layers can overlap, use `sine`, `triangle`, `square`, or `sawtooth` waveforms, and can be shaped with attack, decay, sustain, release, `low_pass`, `delay`, `reverb`, and `soft_limiter` controls.
+Use `generated_sound.roll` to have xbattery build an in-memory audio clip when the monitor configuration is applied, then play that clip when the level is reached. Each entry is a piano-roll event: `notes` is a whitespace-separated note or chord, while `at` and `length` position it in seconds. `gain` controls its volume. Events can overlap and use `sine`, `triangle`, `square`, or `sawtooth` waves; sine is the default, and another wave can be selected with `wave = "triangle"`.
 
-For simpler sequential sounds, `generated_sound.segments` supports `tone` and `silence` entries. A generated sound must define either `layers` or `segments`, not both.
+For envelope control, add `adsr = [attack, decay, sustain, release]`. Attack, decay, and release are measured in seconds; sustain is a level from 0 to 1. Omitting `adsr` uses the built-in envelope. The generated clip can also be shaped with `low_pass`, `delay`, `reverb`, and `soft_limiter` effects.
+
+The previous `generated_sound.layers` notation has been removed. Its `start_seconds`, `duration_seconds`, `volume`, `waveform`, and individual envelope fields are now `at`, `length`, `gain`, `wave`, and `adsr` inside `generated_sound.roll`.
+
+Notes use case-insensitive scientific pitch notation with A4 tuned to 440 Hz and C4 as middle C. Sharps and flats are supported, such as `F#4` and `Bb4`, across the range C-1 through G9. For fine detuning, add up to 100 cents in either direction, such as `C5+9.07c` or `A4-12c`. The detuned pitch must remain inside the supported range and below half of `sample_rate`.
+
+For simpler sequential sounds, `generated_sound.segments` supports `tone` and `silence` entries. Tone segments use `notes`; silence segments omit them. A generated sound must define either `roll` or `segments`, not both.
 
 Set `sound_file` instead if you want to point a level at your own `.wav` file. App-side audio works independently of toast display, so a level with `notify = false` and `generated_sound` or `sound_file` can play audio without showing a Windows notification.
 
-For example:
+For example, a short sequential melody can be written as:
 
 ```toml
 [battery.levels.low]
 threshold_percent = 40
 coarse_level = "low"
 
-generated_sound.layers = [
-    { waveform = "sine", frequencies = [523.25, 526.0, 659.25], start_seconds = 0.0, duration_seconds = 0.24, volume = 0.160, attack_seconds = 0.018, decay_seconds = 0.120, sustain_level = 0.32, release_seconds = 0.110 },
-    { waveform = "sine", frequencies = [261.63, 263.0, 329.63], start_seconds = 0.0, duration_seconds = 0.35, volume = 0.090, attack_seconds = 0.022, decay_seconds = 0.185, sustain_level = 0.38, release_seconds = 0.145 },
-    { waveform = "sine", frequencies = [1046.5, 1051.0], start_seconds = 0.018, duration_seconds = 0.18, volume = 0.036, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.18, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.205, duration_seconds = 0.26, volume = 0.145, attack_seconds = 0.018, decay_seconds = 0.130, sustain_level = 0.30, release_seconds = 0.120 },
-    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.205, duration_seconds = 0.37, volume = 0.082, attack_seconds = 0.024, decay_seconds = 0.195, sustain_level = 0.34, release_seconds = 0.155 },
-    { waveform = "sine", frequencies = [1318.51, 1325.0], start_seconds = 0.223, duration_seconds = 0.18, volume = 0.030, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.16, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.455, duration_seconds = 0.32, volume = 0.150, attack_seconds = 0.020, decay_seconds = 0.160, sustain_level = 0.28, release_seconds = 0.145 },
-    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.455, duration_seconds = 0.45, volume = 0.092, attack_seconds = 0.030, decay_seconds = 0.235, sustain_level = 0.34, release_seconds = 0.180 },
-    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.478, duration_seconds = 0.22, volume = 0.032, attack_seconds = 0.014, decay_seconds = 0.095, sustain_level = 0.14, release_seconds = 0.090 },
-]
-generated_sound.effects = [
-    { kind = "low_pass", cutoff_hz = 6800.0 },
-    { kind = "delay", delay_seconds = 0.105, feedback = 0.08, mix = 0.050 },
-    { kind = "reverb", room_seconds = 0.26, damping = 0.62, mix = 0.11 },
-    { kind = "soft_limiter", drive = 1.05 },
+generated_sound.segments = [
+    { kind = "tone", notes = "C5 E5 G5", duration_seconds = 0.15 },
+    { kind = "silence", duration_seconds = 0.05 },
+    { kind = "tone", notes = "G5 B5 D6", duration_seconds = 0.22 },
 ]
 ```
 

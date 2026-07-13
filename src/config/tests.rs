@@ -5,6 +5,14 @@ use crate::{audio::AudioClip, controller::battery::BatteryLevel};
 use super::AppConfig;
 
 #[test]
+fn bundled_config_is_valid() {
+    let config = toml::from_str::<AppConfig>(include_str!("../../xbattery.toml")).unwrap();
+
+    config.validate().unwrap();
+    assert_eq!(config.battery.warning_levels().unwrap().len(), 4);
+}
+
+#[test]
 fn parses_partial_config_with_defaults() {
     let config = toml::from_str::<AppConfig>(
         r#"
@@ -55,9 +63,9 @@ fn parses_battery_level_config() {
         coarse_level = "empty"
         urgent = true
 
-        generated_sound.layers = [
-            { waveform = "sine", frequencies = [880.0], start_seconds = 0.0, duration_seconds = 0.1, volume = 0.3, decay_seconds = 0.04, sustain_level = 0.08 },
-            { waveform = "triangle", frequencies = [1760.0], start_seconds = 0.02, duration_seconds = 0.06, volume = 0.08, decay_seconds = 0.02, sustain_level = 0.0 },
+        generated_sound.roll = [
+            { notes = "A5", at = 0.0, length = 0.1, gain = 0.3, adsr = [0.008, 0.04, 0.08, 0.028] },
+            { wave = "triangle", notes = "A6", at = 0.02, length = 0.06, gain = 0.08, adsr = [0.008, 0.02, 0.0, 0.028] },
         ]
         generated_sound.effects = [
             { kind = "low_pass", cutoff_hz = 1400.0 },
@@ -123,9 +131,9 @@ fn warning_levels_builds_generated_battery_level_audio() {
         [battery.levels.low]
         threshold_percent = 40
 
-        generated_sound.layers = [
-            { waveform = "sine", frequencies = [523.25], start_seconds = 0.0, duration_seconds = 0.18, volume = 0.20, decay_seconds = 0.07, sustain_level = 0.08 },
-            { waveform = "triangle", frequencies = [1046.5], start_seconds = 0.01, duration_seconds = 0.08, volume = 0.07, decay_seconds = 0.03, sustain_level = 0.0 },
+        generated_sound.roll = [
+            { notes = "C5", at = 0.0, length = 0.18, gain = 0.20, adsr = [0.008, 0.07, 0.08, 0.028] },
+            { wave = "triangle", notes = "C6", at = 0.01, length = 0.08, gain = 0.07, adsr = [0.008, 0.03, 0.0, 0.028] },
         ]
         generated_sound.effects = [
             { kind = "low_pass", cutoff_hz = 1200.0 },
@@ -147,6 +155,28 @@ fn warning_levels_builds_generated_battery_level_audio() {
     }
 
     fs::remove_dir_all(temp_dir).unwrap();
+}
+
+#[test]
+fn warning_levels_builds_audio_from_note_segments() {
+    let config = toml::from_str::<AppConfig>(
+        r#"
+        [battery.levels.low]
+        threshold_percent = 40
+
+        generated_sound.segments = [
+            { kind = "tone", notes = "C5 E5 G5", duration_seconds = 0.1 },
+            { kind = "silence", duration_seconds = 0.04 },
+            { kind = "tone", notes = "C6+7.5c", duration_seconds = 0.1 },
+        ]
+        "#,
+    )
+    .unwrap();
+
+    config.validate().unwrap();
+    let levels = config.battery.warning_levels().unwrap();
+
+    assert!(matches!(levels[0].audio(), Some(AudioClip::WavBytes(_))));
 }
 
 #[test]
@@ -245,7 +275,7 @@ fn rejects_battery_level_with_sound_file_and_generated_sound() {
 }
 
 #[test]
-fn rejects_generated_tone_without_frequencies() {
+fn rejects_generated_tone_without_notes() {
     let config = toml::from_str::<AppConfig>(
         r#"
         [battery.levels.low]
@@ -262,18 +292,18 @@ fn rejects_generated_tone_without_frequencies() {
 
     let error = config.validate().unwrap_err();
 
-    assert!(error.to_string().contains("frequencies"));
+    assert!(error.to_string().contains("notes"));
 }
 
 #[test]
-fn rejects_generated_layer_without_frequencies() {
+fn rejects_roll_event_without_notes() {
     let config = toml::from_str::<AppConfig>(
         r#"
         [battery.levels.low]
         threshold_percent = 40
 
-        generated_sound.layers = [
-            { waveform = "triangle", duration_seconds = 0.1 },
+        generated_sound.roll = [
+            { wave = "triangle", length = 0.1 },
         ]
         "#,
     )
@@ -281,21 +311,132 @@ fn rejects_generated_layer_without_frequencies() {
 
     let error = config.validate().unwrap_err();
 
-    assert!(error.to_string().contains("frequencies"));
+    assert!(error.to_string().contains("notes"));
 }
 
 #[test]
-fn rejects_generated_sound_with_layers_and_segments() {
+fn rejects_invalid_generated_note() {
     let config = toml::from_str::<AppConfig>(
         r#"
         [battery.levels.low]
         threshold_percent = 40
 
+        generated_sound.roll = [
+            { notes = "C5 H4", length = 0.1 },
+        ]
+        "#,
+    )
+    .unwrap();
+
+    let error = config.validate().unwrap_err();
+    let message = error.to_string();
+
+    assert!(message.contains("notes[1]"));
+    assert!(message.contains("H4"));
+}
+
+#[test]
+fn rejects_note_above_sample_rate_nyquist_limit() {
+    let config = toml::from_str::<AppConfig>(
+        r#"
+        [battery.levels.low]
+        threshold_percent = 40
+
+        generated_sound.sample_rate = 8000
+        generated_sound.roll = [
+            { notes = "C8", length = 0.1 },
+        ]
+        "#,
+    )
+    .unwrap();
+
+    let error = config.validate().unwrap_err();
+
+    assert!(error.to_string().contains("Nyquist"));
+}
+
+#[test]
+fn rejects_notes_on_silence_segment() {
+    let config = toml::from_str::<AppConfig>(
+        r#"
+        [battery.levels.low]
+        threshold_percent = 40
+
+        generated_sound.segments = [
+            { kind = "silence", notes = "C4", duration_seconds = 0.1 },
+        ]
+        "#,
+    )
+    .unwrap();
+
+    let error = config.validate().unwrap_err();
+
+    assert!(error.to_string().contains("not valid for silence"));
+}
+
+#[test]
+fn rejects_removed_frequency_config() {
+    let error = toml::from_str::<AppConfig>(
+        r#"
+        [battery.levels.low]
+        threshold_percent = 40
+
+        generated_sound.roll = [
+            { notes = "A4", length = 0.1, frequencies = [440.0] },
+        ]
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("frequencies"));
+}
+
+#[test]
+fn rejects_removed_layer_notation() {
+    let error = toml::from_str::<AppConfig>(
+        r#"
+        [battery.levels.low]
+        threshold_percent = 40
+
         generated_sound.layers = [
-            { waveform = "sine", frequencies = [523.25], duration_seconds = 0.1 },
+            { notes = ["C5"], duration_seconds = 0.1 },
+        ]
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("layers"));
+}
+
+#[test]
+fn rejects_wrong_adsr_length() {
+    let error = toml::from_str::<AppConfig>(
+        r#"
+        [battery.levels.low]
+        threshold_percent = 40
+
+        generated_sound.roll = [
+            { notes = "C5", length = 0.1, adsr = [0.01, 0.02, 0.5] },
+        ]
+        "#,
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("adsr"));
+}
+
+#[test]
+fn rejects_generated_sound_with_roll_and_segments() {
+    let config = toml::from_str::<AppConfig>(
+        r#"
+        [battery.levels.low]
+        threshold_percent = 40
+
+        generated_sound.roll = [
+            { notes = "C5", length = 0.1 },
         ]
         generated_sound.segments = [
-            { kind = "tone", frequencies = [523.25], duration_seconds = 0.1 },
+            { kind = "tone", notes = "C5", duration_seconds = 0.1 },
         ]
         "#,
     )
@@ -303,7 +444,7 @@ fn rejects_generated_sound_with_layers_and_segments() {
 
     let error = config.validate().unwrap_err();
 
-    assert!(error.to_string().contains("both layers and segments"));
+    assert!(error.to_string().contains("both roll and segments"));
 }
 
 #[test]
@@ -313,8 +454,8 @@ fn rejects_generated_delay_with_soft_limiter_fields() {
         [battery.levels.low]
         threshold_percent = 40
 
-        generated_sound.layers = [
-            { waveform = "sine", frequencies = [523.25], duration_seconds = 0.1 },
+        generated_sound.roll = [
+            { notes = "C5", length = 0.1 },
         ]
         generated_sound.effects = [
             { kind = "delay", delay_seconds = 0.05, drive = 1.2 },
@@ -329,14 +470,14 @@ fn rejects_generated_delay_with_soft_limiter_fields() {
 }
 
 #[test]
-fn rejects_generated_layer_sustain_above_one() {
+fn rejects_roll_sustain_above_one() {
     let config = toml::from_str::<AppConfig>(
         r#"
         [battery.levels.low]
         threshold_percent = 40
 
-        generated_sound.layers = [
-            { waveform = "sine", frequencies = [523.25], duration_seconds = 0.1, sustain_level = 1.1 },
+        generated_sound.roll = [
+            { notes = "C5", length = 0.1, adsr = [0.008, 0.0, 1.1, 0.028] },
         ]
         "#,
     )
@@ -344,7 +485,7 @@ fn rejects_generated_layer_sustain_above_one() {
 
     let error = config.validate().unwrap_err();
 
-    assert!(error.to_string().contains("sustain_level"));
+    assert!(error.to_string().contains("adsr[2] (sustain)"));
 }
 
 #[test]
@@ -354,8 +495,8 @@ fn rejects_generated_low_pass_with_delay_fields() {
         [battery.levels.low]
         threshold_percent = 40
 
-        generated_sound.layers = [
-            { waveform = "sine", frequencies = [523.25], duration_seconds = 0.1 },
+        generated_sound.roll = [
+            { notes = "C5", length = 0.1 },
         ]
         generated_sound.effects = [
             { kind = "low_pass", cutoff_hz = 1200.0, mix = 0.1 },
@@ -376,8 +517,8 @@ fn rejects_generated_reverb_room_above_limit() {
         [battery.levels.low]
         threshold_percent = 40
 
-        generated_sound.layers = [
-            { waveform = "sine", frequencies = [523.25], duration_seconds = 0.1 },
+        generated_sound.roll = [
+            { notes = "C5", length = 0.1 },
         ]
         generated_sound.effects = [
             { kind = "reverb", room_seconds = 3.1 },

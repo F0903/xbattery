@@ -9,7 +9,7 @@ use crate::{
     AppResult,
     audio::{
         AudioClip, AudioEffect, AudioEnvelope, AudioLayer, AudioRecipe, AudioSegment,
-        DEFAULT_SAMPLE_RATE, Waveform, render_wav_clip,
+        DEFAULT_SAMPLE_RATE, Waveform, note_frequency, render_wav_clip,
     },
     controller::battery::{BatteryLevel, BatteryWarningLevel},
 };
@@ -36,7 +36,7 @@ pub struct BatteryLevelConfig {
 pub struct AudioRecipeConfig {
     pub sample_rate: Option<u32>,
     pub segments: Vec<AudioSegmentConfig>,
-    pub layers: Vec<AudioLayerConfig>,
+    pub roll: Vec<AudioRollEventConfig>,
     pub effects: Vec<AudioEffectConfig>,
 }
 
@@ -44,23 +44,20 @@ pub struct AudioRecipeConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct AudioSegmentConfig {
     pub kind: AudioSegmentKind,
-    pub frequencies: Vec<f32>,
+    pub notes: String,
     pub duration_seconds: f32,
     pub volume: Option<f32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct AudioLayerConfig {
-    pub waveform: WaveformConfig,
-    pub frequencies: Vec<f32>,
-    pub start_seconds: Option<f32>,
-    pub duration_seconds: f32,
-    pub volume: Option<f32>,
-    pub attack_seconds: Option<f32>,
-    pub decay_seconds: Option<f32>,
-    pub sustain_level: Option<f32>,
-    pub release_seconds: Option<f32>,
+pub struct AudioRollEventConfig {
+    pub notes: String,
+    pub at: Option<f32>,
+    pub length: f32,
+    pub gain: Option<f32>,
+    pub wave: WaveformConfig,
+    pub adsr: Option<[f32; 4]>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -170,12 +167,18 @@ impl AudioRecipeConfig {
             .map(AudioEffectConfig::effect)
             .collect::<Vec<_>>();
 
-        if !self.layers.is_empty() {
+        if !self.roll.is_empty() {
             let layers = self
-                .layers
+                .roll
                 .iter()
-                .map(AudioLayerConfig::layer)
-                .collect::<Vec<_>>();
+                .enumerate()
+                .map(|(index, event)| {
+                    event.layer(
+                        &format!("battery.levels.{level_name}.generated_sound.roll[{index}]"),
+                        sample_rate,
+                    )
+                })
+                .collect::<AppResult<Vec<_>>>()?;
             return Ok(AudioRecipe::with_layers(sample_rate, layers, effects));
         }
 
@@ -183,8 +186,14 @@ impl AudioRecipeConfig {
             let segments = self
                 .segments
                 .iter()
-                .map(AudioSegmentConfig::segment)
-                .collect::<Vec<_>>();
+                .enumerate()
+                .map(|(index, segment)| {
+                    segment.segment(
+                        &format!("battery.levels.{level_name}.generated_sound.segments[{index}]"),
+                        sample_rate,
+                    )
+                })
+                .collect::<AppResult<Vec<_>>>()?;
             return Ok(AudioRecipe::with_segments_and_effects(
                 sample_rate,
                 segments,
@@ -193,46 +202,53 @@ impl AudioRecipeConfig {
         }
 
         Err(
-            format!("battery.levels.{level_name}.generated_sound must define layers or segments")
+            format!("battery.levels.{level_name}.generated_sound must define roll or segments")
                 .into(),
         )
     }
 }
 
 impl AudioSegmentConfig {
-    fn segment(&self) -> AudioSegment {
+    fn segment(&self, field_path: &str, sample_rate: u32) -> AppResult<AudioSegment> {
         match self.kind {
-            AudioSegmentKind::Tone => AudioSegment::Tone {
-                frequencies: self.frequencies.clone(),
+            AudioSegmentKind::Tone => Ok(AudioSegment::Tone {
+                frequencies: resolve_notes(
+                    &self.notes,
+                    &format!("{field_path}.notes"),
+                    sample_rate,
+                )?,
                 duration_seconds: self.duration_seconds,
                 volume: self.volume.unwrap_or(0.25),
-            },
-            AudioSegmentKind::Silence => AudioSegment::Silence {
-                duration_seconds: self.duration_seconds,
-            },
+            }),
+            AudioSegmentKind::Silence if self.notes.trim().is_empty() => {
+                Ok(AudioSegment::Silence {
+                    duration_seconds: self.duration_seconds,
+                })
+            }
+            AudioSegmentKind::Silence => {
+                Err(format!("{field_path}.notes are not valid for silence").into())
+            }
         }
     }
 }
 
-impl AudioLayerConfig {
-    fn layer(&self) -> AudioLayer {
-        AudioLayer::with_audio_envelope(
-            self.waveform.waveform(),
-            self.frequencies.clone(),
-            self.start_seconds.unwrap_or(0.0),
-            self.duration_seconds,
-            self.volume.unwrap_or(0.2),
-            AudioEnvelope::new(
-                self.attack_seconds
-                    .unwrap_or(AudioEnvelope::DEFAULT_ATTACK_SECONDS),
-                self.decay_seconds
-                    .unwrap_or(AudioEnvelope::DEFAULT_DECAY_SECONDS),
-                self.sustain_level
-                    .unwrap_or(AudioEnvelope::DEFAULT_SUSTAIN_LEVEL),
-                self.release_seconds
-                    .unwrap_or(AudioEnvelope::DEFAULT_RELEASE_SECONDS),
-            ),
-        )
+impl AudioRollEventConfig {
+    fn layer(&self, field_path: &str, sample_rate: u32) -> AppResult<AudioLayer> {
+        let envelope = self
+            .adsr
+            .map(|[attack, decay, sustain, release]| {
+                AudioEnvelope::new(attack, decay, sustain, release)
+            })
+            .unwrap_or_default();
+
+        Ok(AudioLayer::with_audio_envelope(
+            self.wave.waveform(),
+            resolve_notes(&self.notes, &format!("{field_path}.notes"), sample_rate)?,
+            self.at.unwrap_or(0.0),
+            self.length,
+            self.gain.unwrap_or(0.2),
+            envelope,
+        ))
     }
 }
 
@@ -268,4 +284,33 @@ impl AudioEffectConfig {
             },
         }
     }
+}
+
+pub(super) fn resolve_notes(
+    notes: &str,
+    field_path: &str,
+    sample_rate: u32,
+) -> AppResult<Vec<f32>> {
+    let notes = notes.split_whitespace().collect::<Vec<_>>();
+    if notes.is_empty() {
+        return Err(format!("{field_path} must not be empty").into());
+    }
+
+    let nyquist_hz = sample_rate as f32 / 2.0;
+    notes
+        .iter()
+        .enumerate()
+        .map(|(index, note)| {
+            let frequency = note_frequency(note)
+                .map_err(|reason| format!("{field_path}[{index}] {note:?} is invalid: {reason}"))?;
+            if frequency >= nyquist_hz {
+                return Err(format!(
+                    "{field_path}[{index}] {note:?} must be below the {nyquist_hz} Hz Nyquist limit"
+                )
+                .into());
+            }
+
+            Ok(frequency)
+        })
+        .collect()
 }

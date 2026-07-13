@@ -3,10 +3,11 @@ use std::{collections::HashSet, path::Path};
 use super::{
     AppConfig,
     battery_config::{
-        AudioEffectConfig, AudioEffectKind, AudioLayerConfig, AudioSegmentConfig, AudioSegmentKind,
+        AudioEffectConfig, AudioEffectKind, AudioRollEventConfig, AudioSegmentConfig,
+        AudioSegmentKind, resolve_notes,
     },
 };
-use crate::AppResult;
+use crate::{AppResult, audio::DEFAULT_SAMPLE_RATE};
 
 pub(super) fn validate(config: &AppConfig) -> AppResult<()> {
     if config.monitor.poll_interval_seconds == 0 {
@@ -136,6 +137,7 @@ fn validate_generated_sound(
     sound: &super::battery_config::AudioRecipeConfig,
 ) -> AppResult<()> {
     let sound_path = format!("{level_path}.generated_sound");
+    let sample_rate = sound.sample_rate.unwrap_or(DEFAULT_SAMPLE_RATE);
 
     if let Some(sample_rate) = sound.sample_rate
         && !(8_000..=192_000).contains(&sample_rate)
@@ -143,20 +145,20 @@ fn validate_generated_sound(
         return Err(format!("{sound_path}.sample_rate must be between 8000 and 192000").into());
     }
 
-    if sound.layers.is_empty() && sound.segments.is_empty() {
-        return Err(format!("{sound_path} must define layers or segments").into());
+    if sound.roll.is_empty() && sound.segments.is_empty() {
+        return Err(format!("{sound_path} must define roll or segments").into());
     }
 
-    if !sound.layers.is_empty() && !sound.segments.is_empty() {
-        return Err(format!("{sound_path} must not define both layers and segments").into());
+    if !sound.roll.is_empty() && !sound.segments.is_empty() {
+        return Err(format!("{sound_path} must not define both roll and segments").into());
     }
 
     for (index, segment) in sound.segments.iter().enumerate() {
-        validate_audio_segment(&sound_path, index, segment)?;
+        validate_audio_segment(&sound_path, index, segment, sample_rate)?;
     }
 
-    for (index, layer) in sound.layers.iter().enumerate() {
-        validate_audio_layer(&sound_path, index, layer)?;
+    for (index, event) in sound.roll.iter().enumerate() {
+        validate_roll_event(&sound_path, index, event, sample_rate)?;
     }
 
     for (index, effect) in sound.effects.iter().enumerate() {
@@ -170,6 +172,7 @@ fn validate_audio_segment(
     sound_path: &str,
     index: usize,
     segment: &AudioSegmentConfig,
+    sample_rate: u32,
 ) -> AppResult<()> {
     let segment_path = format!("{sound_path}.segments[{index}]");
 
@@ -182,55 +185,50 @@ fn validate_audio_segment(
         validate_unit_interval(&format!("{segment_path}.volume"), volume, false)?;
     }
 
-    if segment.kind == AudioSegmentKind::Tone {
-        if segment.frequencies.is_empty() {
-            return Err(format!("{segment_path}.frequencies must not be empty").into());
+    match segment.kind {
+        AudioSegmentKind::Tone => {
+            resolve_notes(
+                &segment.notes,
+                &format!("{segment_path}.notes"),
+                sample_rate,
+            )?;
         }
-
-        validate_frequencies(&format!("{segment_path}.frequencies"), &segment.frequencies)?;
+        AudioSegmentKind::Silence if !segment.notes.trim().is_empty() => {
+            return Err(format!("{segment_path}.notes are not valid for silence").into());
+        }
+        AudioSegmentKind::Silence => {}
     }
 
     Ok(())
 }
 
-fn validate_audio_layer(sound_path: &str, index: usize, layer: &AudioLayerConfig) -> AppResult<()> {
-    let layer_path = format!("{sound_path}.layers[{index}]");
+fn validate_roll_event(
+    sound_path: &str,
+    index: usize,
+    event: &AudioRollEventConfig,
+    sample_rate: u32,
+) -> AppResult<()> {
+    let event_path = format!("{sound_path}.roll[{index}]");
 
-    if layer.frequencies.is_empty() {
-        return Err(format!("{layer_path}.frequencies must not be empty").into());
-    }
+    resolve_notes(&event.notes, &format!("{event_path}.notes"), sample_rate)?;
 
-    validate_frequencies(&format!("{layer_path}.frequencies"), &layer.frequencies)?;
-
-    if let Some(start_seconds) = layer.start_seconds
-        && (!start_seconds.is_finite() || !(0.0..=30.0).contains(&start_seconds))
+    if let Some(at) = event.at
+        && (!at.is_finite() || !(0.0..=30.0).contains(&at))
     {
-        return Err(format!("{layer_path}.start_seconds must be between 0 and 30").into());
+        return Err(format!("{event_path}.at must be between 0 and 30 seconds").into());
     }
 
-    validate_duration_seconds(
-        &format!("{layer_path}.duration_seconds"),
-        layer.duration_seconds,
-    )?;
+    validate_duration_seconds(&format!("{event_path}.length"), event.length)?;
 
-    if let Some(volume) = layer.volume {
-        validate_unit_interval(&format!("{layer_path}.volume"), volume, false)?;
+    if let Some(gain) = event.gain {
+        validate_unit_interval(&format!("{event_path}.gain"), gain, false)?;
     }
 
-    if let Some(attack_seconds) = layer.attack_seconds {
-        validate_envelope_seconds(&format!("{layer_path}.attack_seconds"), attack_seconds)?;
-    }
-
-    if let Some(decay_seconds) = layer.decay_seconds {
-        validate_envelope_seconds(&format!("{layer_path}.decay_seconds"), decay_seconds)?;
-    }
-
-    if let Some(sustain_level) = layer.sustain_level {
-        validate_unit_interval(&format!("{layer_path}.sustain_level"), sustain_level, true)?;
-    }
-
-    if let Some(release_seconds) = layer.release_seconds {
-        validate_envelope_seconds(&format!("{layer_path}.release_seconds"), release_seconds)?;
+    if let Some([attack, decay, sustain, release]) = event.adsr {
+        validate_envelope_seconds(&format!("{event_path}.adsr[0] (attack)"), attack)?;
+        validate_envelope_seconds(&format!("{event_path}.adsr[1] (decay)"), decay)?;
+        validate_unit_interval(&format!("{event_path}.adsr[2] (sustain)"), sustain, true)?;
+        validate_envelope_seconds(&format!("{event_path}.adsr[3] (release)"), release)?;
     }
 
     Ok(())
@@ -382,18 +380,6 @@ fn validate_unit_interval(field_path: &str, value: f32, allow_zero: bool) -> App
             format!("{field_path} must be greater than 0 and at most 1")
         };
         return Err(message.into());
-    }
-
-    Ok(())
-}
-
-fn validate_frequencies(field_path: &str, frequencies: &[f32]) -> AppResult<()> {
-    for frequency in frequencies {
-        if !frequency.is_finite() || *frequency <= 0.0 || *frequency > 20_000.0 {
-            return Err(
-                format!("{field_path} values must be greater than 0 and at most 20000").into(),
-            );
-        }
     }
 
     Ok(())
