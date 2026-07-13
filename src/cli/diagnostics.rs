@@ -9,8 +9,8 @@ use xbattery::{
 };
 
 pub(super) fn probe() -> AppResult<()> {
-    let xinput = XInputBackend::new();
-    let win_rt = WinRTBackend::new();
+    let xinput = XInputBackend;
+    let win_rt = WinRTBackend;
 
     println!("XInput controllers:");
     for report in xinput.diagnostic_reports()? {
@@ -59,7 +59,7 @@ pub(super) fn probe() -> AppResult<()> {
 }
 
 pub(super) fn gameinput_probe() -> AppResult<()> {
-    let gameinput = GameInputBackend::new();
+    let gameinput = GameInputBackend;
 
     println!("GameInput RegisterDeviceCallback blocking enumeration:");
     let events = gameinput.diagnostic_snapshots()?;
@@ -90,7 +90,7 @@ pub(super) fn gameinput_probe() -> AppResult<()> {
 }
 
 pub(super) fn gameinput_watch() -> AppResult<()> {
-    let gameinput = GameInputBackend::new();
+    let gameinput = GameInputBackend;
 
     println!("GameInput persistent callback watcher:");
     let stream = gameinput.start_diagnostic_event_stream()?;

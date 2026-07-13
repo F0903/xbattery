@@ -3,13 +3,12 @@ use std::{thread, time::Duration};
 use crate::{
     AppResult,
     controller::{
-        Controller, ControllerSource,
-        backend::{BackendKind, BatteryBackend, InputBackend},
+        Controller,
         battery::{BatteryCharge, BatteryLevel, BatteryReading},
     },
 };
 
-use super::{XInputDiagnosticReport, native, snapshot::ControllerSnapshot};
+use super::{XInputDiagnosticReport, native};
 
 const BATTERY_SETTLE_ATTEMPTS: usize = 13;
 const BATTERY_SETTLE_DELAY: Duration = Duration::from_millis(500);
@@ -18,10 +17,6 @@ const BATTERY_SETTLE_DELAY: Duration = Duration::from_millis(500);
 pub struct XInputBackend;
 
 impl XInputBackend {
-    pub fn new() -> Self {
-        Self
-    }
-
     pub fn diagnostic_reports(&self) -> AppResult<Vec<XInputDiagnosticReport>> {
         Ok(native::poll_controllers()?
             .into_iter()
@@ -41,15 +36,6 @@ impl XInputBackend {
             .collect())
     }
 
-    fn controller_from_snapshot(snapshot: ControllerSnapshot) -> Controller {
-        Controller::new(
-            format!("xinput:{}", snapshot.slot),
-            snapshot.name(),
-            ControllerSource::XInput,
-            snapshot.battery,
-        )
-    }
-
     fn battery_readings_once() -> AppResult<Vec<BatteryReading>> {
         Ok(native::poll_controllers()?
             .into_iter()
@@ -57,29 +43,44 @@ impl XInputBackend {
             .map(|snapshot| snapshot.battery)
             .collect())
     }
-}
-
-impl InputBackend for XInputBackend {
-    fn poll_controllers(&self) -> AppResult<Vec<Controller>> {
-        Ok(native::poll_controllers()?
-            .into_iter()
-            .flatten()
-            .map(Self::controller_from_snapshot)
-            .collect())
-    }
-}
-
-impl BatteryBackend for XInputBackend {
-    fn backend_kind(&self) -> BackendKind {
-        BackendKind::XInput
-    }
-
-    fn battery_readings(&self) -> AppResult<Vec<BatteryReading>> {
-        Self::battery_readings_once()
-    }
 
     fn settled_battery_readings(&self) -> AppResult<Vec<BatteryReading>> {
         settle_battery_readings(Self::battery_readings_once, thread::sleep)
+    }
+
+    pub(crate) fn attach_to_many(&self, controllers: Vec<Controller>) -> Vec<Controller> {
+        let Ok(readings) = self.settled_battery_readings() else {
+            return controllers;
+        };
+
+        attach_to_many(controllers, readings)
+    }
+
+    pub(crate) fn attach_to_one(&self, controller: Controller) -> Controller {
+        let Ok(readings) = self.settled_battery_readings() else {
+            return controller;
+        };
+
+        attach_to_one(controller, &readings)
+    }
+}
+
+fn attach_to_many(controllers: Vec<Controller>, readings: Vec<BatteryReading>) -> Vec<Controller> {
+    if readings.len() != controllers.len() {
+        return controllers;
+    }
+
+    controllers
+        .into_iter()
+        .zip(readings)
+        .map(|(controller, reading)| controller.with_battery(reading))
+        .collect()
+}
+
+fn attach_to_one(controller: Controller, readings: &[BatteryReading]) -> Controller {
+    match readings {
+        [reading] => controller.with_battery(*reading),
+        _ => controller,
     }
 }
 
@@ -117,9 +118,43 @@ fn settle_battery_readings(
 
 #[cfg(test)]
 mod tests {
-    use crate::controller::battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading};
+    use crate::controller::{
+        Controller,
+        battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading},
+    };
 
-    use super::{settle_battery_readings, should_wait_for_battery_to_settle};
+    use super::{
+        attach_to_many, attach_to_one, settle_battery_readings, should_wait_for_battery_to_settle,
+    };
+
+    #[test]
+    fn attaches_matching_battery_readings() {
+        let controllers = vec![Controller::new("one", reading(BatteryLevel::Full))];
+
+        let controllers = attach_to_many(controllers, vec![reading(BatteryLevel::Medium)]);
+
+        assert_eq!(controllers[0].battery(), reading(BatteryLevel::Medium));
+    }
+
+    #[test]
+    fn leaves_controllers_unchanged_when_reading_count_differs() {
+        let controllers = vec![Controller::new("one", reading(BatteryLevel::Full))];
+
+        let controllers = attach_to_many(controllers, Vec::new());
+
+        assert_eq!(controllers[0].battery(), reading(BatteryLevel::Full));
+    }
+
+    #[test]
+    fn attaches_to_one_only_for_a_single_reading() {
+        let controller = Controller::new("one", reading(BatteryLevel::Full));
+
+        let attached = attach_to_one(controller.clone(), &[reading(BatteryLevel::Medium)]);
+        let unchanged = attach_to_one(controller, &[]);
+
+        assert_eq!(attached.battery(), reading(BatteryLevel::Medium));
+        assert_eq!(unchanged.battery(), reading(BatteryLevel::Full));
+    }
 
     #[test]
     fn waits_for_any_low_or_empty_battery_reading_to_settle() {

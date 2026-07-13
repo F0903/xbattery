@@ -1,8 +1,10 @@
+mod audio_clip;
 mod generator;
 mod playback;
 
+pub use audio_clip::AudioClip;
 pub use generator::{
-    AudioEffect, AudioGenerator, AudioLayer, AudioRecipe, AudioSegment, DEFAULT_SAMPLE_RATE,
-    Waveform,
+    AudioEffect, AudioEnvelope, AudioLayer, AudioRecipe, AudioSegment, DEFAULT_SAMPLE_RATE,
+    Waveform, render_wav_clip,
 };
-pub use playback::{play_file, play_file_blocking};
+pub use playback::{play, play_blocking};

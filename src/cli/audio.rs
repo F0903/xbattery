@@ -1,52 +1,24 @@
-#[cfg(debug_assertions)]
-use std::{path::PathBuf, thread, time::Duration};
+use std::{thread, time::Duration};
 
-use xbattery::{AppResult, config::AppConfig};
+use xbattery::{AppResult, audio, config::AppConfig, controller::battery::BatteryWarningLevel};
 
-#[cfg(debug_assertions)]
-use xbattery::{audio, controller::battery::BatteryWarningLevel};
-
-#[cfg(debug_assertions)]
 const SOUND_TEST_PAUSE: Duration = Duration::from_millis(150);
 
-pub(super) fn generate_sounds() -> AppResult<()> {
-    let loaded = AppConfig::load_with_source()?;
-    let files = loaded.config.generated_sound_files();
-
-    if files.is_empty() {
-        println!("No generated sounds are configured.");
-        return Ok(());
-    }
-
-    println!("Generated configured sounds:");
-    for file in files {
-        println!("  {}", file.display());
-    }
-
-    Ok(())
-}
-
-#[cfg(debug_assertions)]
-pub(super) fn test_file(path: PathBuf) -> AppResult<()> {
-    println!("Playing {}", path.display());
-    audio::play_file_blocking(&path)
-}
-
-#[cfg(debug_assertions)]
 pub(super) fn test_config() -> AppResult<()> {
     let loaded = AppConfig::load_with_source()?;
     let mut sounds = loaded
         .config
         .battery
-        .warning_levels(loaded.config.notifications.urgent_precise_threshold_percent)
+        .warning_levels()?
         .into_iter()
-        .filter_map(|level| {
-            let path = level.sound_file()?.to_path_buf();
-            Some((level_sort_percent(&level), level.name().to_owned(), path))
-        })
+        .filter(|level| level.audio().is_some())
         .collect::<Vec<_>>();
 
-    sounds.sort_by(|left, right| right.0.cmp(&left.0).then_with(|| left.1.cmp(&right.1)));
+    sounds.sort_by(|left, right| {
+        level_sort_percent(right)
+            .cmp(&level_sort_percent(left))
+            .then_with(|| left.name().cmp(right.name()))
+    });
 
     match &loaded.path {
         Some(path) => println!("Loaded config from {}", path.display()),
@@ -54,18 +26,20 @@ pub(super) fn test_config() -> AppResult<()> {
     }
 
     if sounds.is_empty() {
-        println!("No battery level sounds are configured.");
+        println!("No battery level audio is configured.");
         return Ok(());
     }
 
-    println!("Playing configured battery level sounds:");
-    for (index, (percent, name, path)) in sounds.iter().enumerate() {
-        match percent {
-            Some(percent) => println!("  {name} (~{percent}%): {}", path.display()),
-            None => println!("  {name}: {}", path.display()),
+    println!("Playing configured battery level audio:");
+    for (index, level) in sounds.iter().enumerate() {
+        let audio_clip = level.audio().expect("filtered levels with audio");
+
+        match level_sort_percent(level) {
+            Some(percent) => println!("  {} (~{percent}%): {}", level.name(), audio_clip),
+            None => println!("  {}: {audio_clip}", level.name()),
         }
 
-        audio::play_file_blocking(path)?;
+        audio::play_blocking(audio_clip)?;
 
         if index + 1 < sounds.len() {
             thread::sleep(SOUND_TEST_PAUSE);
@@ -75,7 +49,6 @@ pub(super) fn test_config() -> AppResult<()> {
     Ok(())
 }
 
-#[cfg(debug_assertions)]
 fn level_sort_percent(level: &BatteryWarningLevel) -> Option<u8> {
     level
         .precise_threshold_percent()

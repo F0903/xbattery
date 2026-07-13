@@ -41,11 +41,10 @@ xbattery.exe status
 xbattery.exe check-update
 xbattery.exe update
 xbattery.exe update --dry-run
-xbattery.exe generate-sounds
 xbattery.exe uninstall
 ```
 
-`generate-sounds` writes the WAV files configured with `generated_sound.layers` or `generated_sound.segments`. `uninstall` removes the startup task but leaves the installed files and config in place.
+`uninstall` removes the startup task but leaves the installed files and config in place.
 
 `check-update` looks for a newer GitHub Release. `update` downloads the matching release asset, stops the background monitor, replaces the installed executable, and restarts the monitor if it was running. Use `update --dry-run` to check what would happen without changing files.
 
@@ -104,18 +103,18 @@ generated_sound.layers = [
     { waveform = "sine", frequencies = [523.25, 526.0, 659.25], start_seconds = 0.0, duration_seconds = 0.24, volume = 0.160, attack_seconds = 0.018, decay_seconds = 0.120, sustain_level = 0.32, release_seconds = 0.110 },
     { waveform = "sine", frequencies = [261.63, 263.0, 329.63], start_seconds = 0.0, duration_seconds = 0.35, volume = 0.090, attack_seconds = 0.022, decay_seconds = 0.185, sustain_level = 0.38, release_seconds = 0.145 },
     { waveform = "sine", frequencies = [1046.5, 1051.0], start_seconds = 0.018, duration_seconds = 0.18, volume = 0.036, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.18, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.205, duration_seconds = 0.26, volume = 0.140, attack_seconds = 0.018, decay_seconds = 0.130, sustain_level = 0.30, release_seconds = 0.120 },
-    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.205, duration_seconds = 0.37, volume = 0.080, attack_seconds = 0.024, decay_seconds = 0.195, sustain_level = 0.34, release_seconds = 0.155 },
+    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.205, duration_seconds = 0.26, volume = 0.145, attack_seconds = 0.018, decay_seconds = 0.130, sustain_level = 0.30, release_seconds = 0.120 },
+    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.205, duration_seconds = 0.37, volume = 0.082, attack_seconds = 0.024, decay_seconds = 0.195, sustain_level = 0.34, release_seconds = 0.155 },
     { waveform = "sine", frequencies = [1318.51, 1325.0], start_seconds = 0.223, duration_seconds = 0.18, volume = 0.030, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.16, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.455, duration_seconds = 0.34, volume = 0.170, attack_seconds = 0.020, decay_seconds = 0.165, sustain_level = 0.28, release_seconds = 0.150 },
-    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.455, duration_seconds = 0.48, volume = 0.100, attack_seconds = 0.030, decay_seconds = 0.250, sustain_level = 0.34, release_seconds = 0.190 },
-    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.478, duration_seconds = 0.24, volume = 0.035, attack_seconds = 0.014, decay_seconds = 0.100, sustain_level = 0.14, release_seconds = 0.095 },
+    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.455, duration_seconds = 0.32, volume = 0.150, attack_seconds = 0.020, decay_seconds = 0.160, sustain_level = 0.28, release_seconds = 0.145 },
+    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.455, duration_seconds = 0.45, volume = 0.092, attack_seconds = 0.030, decay_seconds = 0.235, sustain_level = 0.34, release_seconds = 0.180 },
+    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.478, duration_seconds = 0.22, volume = 0.032, attack_seconds = 0.014, decay_seconds = 0.095, sustain_level = 0.14, release_seconds = 0.090 },
 ]
 generated_sound.effects = [
-    { kind = "low_pass", cutoff_hz = 6400.0 },
-    { kind = "delay", delay_seconds = 0.110, feedback = 0.08, mix = 0.050 },
-    { kind = "reverb", room_seconds = 0.30, damping = 0.62, mix = 0.12 },
-    { kind = "soft_limiter", drive = 1.07 },
+    { kind = "low_pass", cutoff_hz = 6800.0 },
+    { kind = "delay", delay_seconds = 0.105, feedback = 0.08, mix = 0.050 },
+    { kind = "reverb", room_seconds = 0.26, damping = 0.62, mix = 0.11 },
+    { kind = "soft_limiter", drive = 1.05 },
 ]
 
 [battery.levels.empty]
@@ -125,27 +124,21 @@ notify = true
 urgent = true
 
 generated_sound.layers = [
-    { waveform = "sine", frequencies = [523.25, 526.0, 659.25], start_seconds = 0.0, duration_seconds = 0.20, volume = 0.170, attack_seconds = 0.012, decay_seconds = 0.090, sustain_level = 0.24, release_seconds = 0.090 },
-    { waveform = "sine", frequencies = [261.63, 263.0, 329.63], start_seconds = 0.0, duration_seconds = 0.30, volume = 0.095, attack_seconds = 0.018, decay_seconds = 0.145, sustain_level = 0.32, release_seconds = 0.125 },
-    { waveform = "sine", frequencies = [1046.5, 1051.0], start_seconds = 0.012, duration_seconds = 0.14, volume = 0.040, attack_seconds = 0.008, decay_seconds = 0.058, sustain_level = 0.12, release_seconds = 0.060 },
-    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.170, duration_seconds = 0.20, volume = 0.160, attack_seconds = 0.012, decay_seconds = 0.092, sustain_level = 0.22, release_seconds = 0.092 },
-    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.170, duration_seconds = 0.30, volume = 0.088, attack_seconds = 0.018, decay_seconds = 0.150, sustain_level = 0.30, release_seconds = 0.128 },
-    { waveform = "sine", frequencies = [1318.51, 1325.0], start_seconds = 0.184, duration_seconds = 0.14, volume = 0.036, attack_seconds = 0.008, decay_seconds = 0.058, sustain_level = 0.12, release_seconds = 0.060 },
-    { waveform = "sine", frequencies = [523.25, 526.0, 659.25], start_seconds = 0.420, duration_seconds = 0.20, volume = 0.160, attack_seconds = 0.012, decay_seconds = 0.090, sustain_level = 0.22, release_seconds = 0.090 },
-    { waveform = "sine", frequencies = [261.63, 263.0, 329.63], start_seconds = 0.420, duration_seconds = 0.31, volume = 0.090, attack_seconds = 0.018, decay_seconds = 0.150, sustain_level = 0.30, release_seconds = 0.130 },
-    { waveform = "sine", frequencies = [1046.5, 1051.0], start_seconds = 0.432, duration_seconds = 0.14, volume = 0.034, attack_seconds = 0.008, decay_seconds = 0.058, sustain_level = 0.10, release_seconds = 0.060 },
-    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.590, duration_seconds = 0.21, volume = 0.150, attack_seconds = 0.012, decay_seconds = 0.095, sustain_level = 0.22, release_seconds = 0.095 },
-    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.590, duration_seconds = 0.32, volume = 0.088, attack_seconds = 0.018, decay_seconds = 0.155, sustain_level = 0.30, release_seconds = 0.135 },
-    { waveform = "sine", frequencies = [1318.51, 1325.0], start_seconds = 0.604, duration_seconds = 0.14, volume = 0.032, attack_seconds = 0.008, decay_seconds = 0.058, sustain_level = 0.10, release_seconds = 0.060 },
-    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.835, duration_seconds = 0.36, volume = 0.230, attack_seconds = 0.020, decay_seconds = 0.170, sustain_level = 0.28, release_seconds = 0.160 },
-    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.835, duration_seconds = 0.52, volume = 0.130, attack_seconds = 0.032, decay_seconds = 0.265, sustain_level = 0.34, release_seconds = 0.210 },
-    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.860, duration_seconds = 0.24, volume = 0.045, attack_seconds = 0.014, decay_seconds = 0.095, sustain_level = 0.12, release_seconds = 0.100 },
+    { waveform = "sine", frequencies = [987.77, 992.0, 1318.51], start_seconds = 0.0, duration_seconds = 0.15, volume = 0.150, attack_seconds = 0.010, decay_seconds = 0.070, sustain_level = 0.18, release_seconds = 0.070 },
+    { waveform = "sine", frequencies = [493.88, 496.0, 659.25], start_seconds = 0.0, duration_seconds = 0.23, volume = 0.092, attack_seconds = 0.016, decay_seconds = 0.120, sustain_level = 0.28, release_seconds = 0.095 },
+    { waveform = "sine", frequencies = [1760.0, 1768.0], start_seconds = 0.010, duration_seconds = 0.10, volume = 0.026, attack_seconds = 0.006, decay_seconds = 0.040, sustain_level = 0.08, release_seconds = 0.045 },
+    { waveform = "sine", frequencies = [739.99, 744.0, 987.77], start_seconds = 0.175, duration_seconds = 0.16, volume = 0.165, attack_seconds = 0.010, decay_seconds = 0.076, sustain_level = 0.18, release_seconds = 0.074 },
+    { waveform = "sine", frequencies = [369.99, 372.0, 493.88], start_seconds = 0.175, duration_seconds = 0.25, volume = 0.100, attack_seconds = 0.017, decay_seconds = 0.130, sustain_level = 0.28, release_seconds = 0.105 },
+    { waveform = "sine", frequencies = [1479.98, 1488.0], start_seconds = 0.188, duration_seconds = 0.11, volume = 0.030, attack_seconds = 0.006, decay_seconds = 0.043, sustain_level = 0.08, release_seconds = 0.045 },
+    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.390, duration_seconds = 0.24, volume = 0.205, attack_seconds = 0.016, decay_seconds = 0.120, sustain_level = 0.22, release_seconds = 0.110 },
+    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.390, duration_seconds = 0.36, volume = 0.132, attack_seconds = 0.024, decay_seconds = 0.190, sustain_level = 0.34, release_seconds = 0.150 },
+    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.410, duration_seconds = 0.16, volume = 0.038, attack_seconds = 0.010, decay_seconds = 0.062, sustain_level = 0.10, release_seconds = 0.065 },
 ]
 generated_sound.effects = [
-    { kind = "low_pass", cutoff_hz = 6600.0 },
-    { kind = "delay", delay_seconds = 0.096, feedback = 0.07, mix = 0.050 },
-    { kind = "reverb", room_seconds = 0.34, damping = 0.62, mix = 0.13 },
-    { kind = "soft_limiter", drive = 1.10 },
+    { kind = "low_pass", cutoff_hz = 6800.0 },
+    { kind = "delay", delay_seconds = 0.072, feedback = 0.05, mix = 0.035 },
+    { kind = "reverb", room_seconds = 0.18, damping = 0.62, mix = 0.10 },
+    { kind = "soft_limiter", drive = 1.08 },
 ]
 
 [notifications]
@@ -167,9 +160,9 @@ Set `notify_connected` or `notify_disconnected` to `false` if you only want batt
 
 Each battery level can match precise battery APIs with `threshold_percent`, coarse battery APIs with `coarse_level`, or both. Set `notify = true` for levels that should show a battery warning toast, and `urgent = true` for levels that should request urgent Windows toast delivery.
 
-Use `generated_sound.layers` to have xbattery write a local `.wav` file when the config is loaded, then play that file when the level is reached. Layers can overlap, use `sine`, `triangle`, `square`, or `sawtooth` waveforms, and can be shaped with attack, decay, sustain, release, `low_pass`, `delay`, `reverb`, and `soft_limiter` controls. If `generated_sound.file` is omitted, xbattery writes to `sounds/<level>.wav`. Relative paths are resolved relative to `xbattery.toml`.
+Use `generated_sound.layers` to have xbattery build an in-memory audio clip when the monitor configuration is applied, then play that clip when the level is reached. Layers can overlap, use `sine`, `triangle`, `square`, or `sawtooth` waveforms, and can be shaped with attack, decay, sustain, release, `low_pass`, `delay`, `reverb`, and `soft_limiter` controls.
 
-For simpler sequential sounds, `generated_sound.segments` still supports `tone` and `silence` entries. A generated sound must define either `layers` or `segments`, not both.
+For simpler sequential sounds, `generated_sound.segments` supports `tone` and `silence` entries. A generated sound must define either `layers` or `segments`, not both.
 
 Set `sound_file` instead if you want to point a level at your own `.wav` file. App-side audio works independently of toast display, so a level with `notify = false` and `generated_sound` or `sound_file` can play audio without showing a Windows notification.
 
@@ -184,18 +177,18 @@ generated_sound.layers = [
     { waveform = "sine", frequencies = [523.25, 526.0, 659.25], start_seconds = 0.0, duration_seconds = 0.24, volume = 0.160, attack_seconds = 0.018, decay_seconds = 0.120, sustain_level = 0.32, release_seconds = 0.110 },
     { waveform = "sine", frequencies = [261.63, 263.0, 329.63], start_seconds = 0.0, duration_seconds = 0.35, volume = 0.090, attack_seconds = 0.022, decay_seconds = 0.185, sustain_level = 0.38, release_seconds = 0.145 },
     { waveform = "sine", frequencies = [1046.5, 1051.0], start_seconds = 0.018, duration_seconds = 0.18, volume = 0.036, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.18, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.205, duration_seconds = 0.26, volume = 0.140, attack_seconds = 0.018, decay_seconds = 0.130, sustain_level = 0.30, release_seconds = 0.120 },
-    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.205, duration_seconds = 0.37, volume = 0.080, attack_seconds = 0.024, decay_seconds = 0.195, sustain_level = 0.34, release_seconds = 0.155 },
+    { waveform = "sine", frequencies = [659.25, 662.5, 783.99], start_seconds = 0.205, duration_seconds = 0.26, volume = 0.145, attack_seconds = 0.018, decay_seconds = 0.130, sustain_level = 0.30, release_seconds = 0.120 },
+    { waveform = "sine", frequencies = [329.63, 331.0, 392.0], start_seconds = 0.205, duration_seconds = 0.37, volume = 0.082, attack_seconds = 0.024, decay_seconds = 0.195, sustain_level = 0.34, release_seconds = 0.155 },
     { waveform = "sine", frequencies = [1318.51, 1325.0], start_seconds = 0.223, duration_seconds = 0.18, volume = 0.030, attack_seconds = 0.012, decay_seconds = 0.080, sustain_level = 0.16, release_seconds = 0.080 },
-    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.455, duration_seconds = 0.34, volume = 0.170, attack_seconds = 0.020, decay_seconds = 0.165, sustain_level = 0.28, release_seconds = 0.150 },
-    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.455, duration_seconds = 0.48, volume = 0.100, attack_seconds = 0.030, decay_seconds = 0.250, sustain_level = 0.34, release_seconds = 0.190 },
-    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.478, duration_seconds = 0.24, volume = 0.035, attack_seconds = 0.014, decay_seconds = 0.100, sustain_level = 0.14, release_seconds = 0.095 },
+    { waveform = "sine", frequencies = [392.0, 394.0, 493.88], start_seconds = 0.455, duration_seconds = 0.32, volume = 0.150, attack_seconds = 0.020, decay_seconds = 0.160, sustain_level = 0.28, release_seconds = 0.145 },
+    { waveform = "sine", frequencies = [196.0, 197.0, 246.94], start_seconds = 0.455, duration_seconds = 0.45, volume = 0.092, attack_seconds = 0.030, decay_seconds = 0.235, sustain_level = 0.34, release_seconds = 0.180 },
+    { waveform = "sine", frequencies = [783.99, 790.0], start_seconds = 0.478, duration_seconds = 0.22, volume = 0.032, attack_seconds = 0.014, decay_seconds = 0.095, sustain_level = 0.14, release_seconds = 0.090 },
 ]
 generated_sound.effects = [
-    { kind = "low_pass", cutoff_hz = 6400.0 },
-    { kind = "delay", delay_seconds = 0.110, feedback = 0.08, mix = 0.050 },
-    { kind = "reverb", room_seconds = 0.30, damping = 0.62, mix = 0.12 },
-    { kind = "soft_limiter", drive = 1.07 },
+    { kind = "low_pass", cutoff_hz = 6800.0 },
+    { kind = "delay", delay_seconds = 0.105, feedback = 0.08, mix = 0.050 },
+    { kind = "reverb", room_seconds = 0.26, damping = 0.62, mix = 0.11 },
+    { kind = "soft_limiter", drive = 1.05 },
 ]
 ```
 
@@ -265,8 +258,6 @@ For development diagnostics, use a debug build:
 cargo run -- probe
 cargo run -- gameinput-probe
 cargo run -- gameinput-watch
-cargo run -- notification-preview
-cargo run -- audio-file-test sounds\low.wav
 cargo run -- config-audio-test
-cargo run -- generate-sounds
+cargo run -- notification-preview
 ```

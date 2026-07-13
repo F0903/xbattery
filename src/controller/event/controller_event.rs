@@ -1,6 +1,5 @@
-use std::path::Path;
-
 use crate::{
+    audio::AudioClip,
     controller::{
         Controller,
         battery::{BatteryCharge, BatteryKind, BatteryReading, BatteryWarning},
@@ -14,20 +13,10 @@ use super::ControllerNotificationPolicy;
 pub enum ControllerEvent {
     Connected(Controller),
     Disconnected(Controller),
-    BatteryWarning {
-        current: Controller,
-        warning: BatteryWarning,
-    },
+    BatteryWarning { warning: BatteryWarning },
 }
 
 impl ControllerEvent {
-    pub fn controller(&self) -> &Controller {
-        match self {
-            Self::Connected(controller) | Self::Disconnected(controller) => controller,
-            Self::BatteryWarning { current, .. } => current,
-        }
-    }
-
     pub fn notification(&self, policy: &ControllerNotificationPolicy) -> Option<Notification> {
         match self {
             Self::Connected(_) if !policy.notify_connected() => None,
@@ -40,17 +29,16 @@ impl ControllerEvent {
                 "Xbox Controller Disconnected",
                 disconnected_body(controller.battery()),
             )),
-            Self::BatteryWarning {
-                current: _,
-                warning,
-            } if warning.level().notify() => Some(policy.notification_for_battery_warning(warning)),
+            Self::BatteryWarning { warning } if warning.level().notify() => {
+                Some(policy.notification_for_battery_warning(warning))
+            }
             Self::BatteryWarning { .. } => None,
         }
     }
 
-    pub fn sound_file(&self) -> Option<&Path> {
+    pub fn audio(&self) -> Option<&AudioClip> {
         match self {
-            Self::BatteryWarning { warning, .. } => warning.level().sound_file(),
+            Self::BatteryWarning { warning } => warning.level().audio(),
             Self::Connected(_) | Self::Disconnected(_) => None,
         }
     }

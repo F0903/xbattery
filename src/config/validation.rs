@@ -19,16 +19,6 @@ pub(super) fn validate(config: &AppConfig) -> AppResult<()> {
 
     validate_battery_config(config)?;
 
-    if config
-        .notifications
-        .urgent_precise_threshold_percent
-        .is_some_and(|threshold| threshold > 100)
-    {
-        return Err(
-            "notifications.urgent_precise_threshold_percent must be between 0 and 100".into(),
-        );
-    }
-
     if config.notifications.app_id.trim().is_empty() {
         return Err("notifications.app_id must not be empty".into());
     }
@@ -57,18 +47,6 @@ pub(super) fn validate(config: &AppConfig) -> AppResult<()> {
 }
 
 fn validate_battery_config(config: &AppConfig) -> AppResult<()> {
-    if let Some(thresholds) = &config.battery.precise_warning_thresholds {
-        if thresholds.is_empty() {
-            return Err("battery.precise_warning_thresholds must not be empty".into());
-        }
-
-        if thresholds.iter().any(|threshold| *threshold > 100) {
-            return Err(
-                "battery.precise_warning_thresholds values must be between 0 and 100".into(),
-            );
-        }
-    }
-
     let Some(levels) = &config.battery.levels else {
         return Ok(());
     };
@@ -129,7 +107,7 @@ fn validate_battery_config(config: &AppConfig) -> AppResult<()> {
         }
 
         if let Some(generated_sound) = &level.generated_sound {
-            validate_generated_sound(&level_path, name, generated_sound)?;
+            validate_generated_sound(&level_path, generated_sound)?;
         }
     }
 
@@ -155,12 +133,9 @@ fn validate_sound_file(field_path: &str, sound_file: &Path) -> AppResult<()> {
 
 fn validate_generated_sound(
     level_path: &str,
-    name: &str,
     sound: &super::battery_config::AudioRecipeConfig,
 ) -> AppResult<()> {
     let sound_path = format!("{level_path}.generated_sound");
-    let file = sound.file_for_level(name);
-    validate_sound_file(&format!("{sound_path}.file"), &file)?;
 
     if let Some(sample_rate) = sound.sample_rate
         && !(8_000..=192_000).contains(&sample_rate)

@@ -4,8 +4,7 @@ use xbattery::{
     AppResult,
     config::AppConfig,
     controller::{
-        Controller, ControllerSource,
-        backend::BackendKind,
+        Controller,
         battery::{
             BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning,
             BatteryWarningLevel,
@@ -54,9 +53,7 @@ pub(super) fn preview() -> AppResult<()> {
     let config = AppConfig::load()?;
     let policy = ControllerNotificationPolicy::new().with_connectivity_notifications(true, true);
     let notifier = ToastNotifier::new(config.toast_config());
-    let warning_levels = config
-        .battery
-        .warning_levels(config.notifications.urgent_precise_threshold_percent);
+    let warning_levels = config.battery.warning_levels()?;
     let previews = preview_events(&warning_levels);
 
     println!("Sending xbattery notification preview.");
@@ -85,20 +82,17 @@ fn preview_events(warning_levels: &[BatteryWarningLevel]) -> Vec<PreviewEvent> {
     let mut previews = vec![
         PreviewEvent {
             label: "connected".to_string(),
-            event: ControllerEvent::Connected(sample_controller(
-                BackendKind::XInput,
-                BatteryReading::new(
-                    BatteryKind::Alkaline,
-                    BatteryCharge::Coarse(BatteryLevel::Full),
-                ),
-            )),
+            event: ControllerEvent::Connected(sample_controller(BatteryReading::new(
+                BatteryKind::Alkaline,
+                BatteryCharge::Coarse(BatteryLevel::Full),
+            ))),
         },
         PreviewEvent {
             label: "disconnected".to_string(),
-            event: ControllerEvent::Disconnected(sample_controller(
-                BackendKind::XInput,
-                BatteryReading::new(BatteryKind::Disconnected, BatteryCharge::Unknown),
-            )),
+            event: ControllerEvent::Disconnected(sample_controller(BatteryReading::new(
+                BatteryKind::Disconnected,
+                BatteryCharge::Unknown,
+            ))),
         },
     ];
 
@@ -139,10 +133,6 @@ fn precise_warning(percent: u8, level: BatteryWarningLevel) -> PreviewEvent {
     PreviewEvent {
         label: warning_label(&level, format!("{percent}% battery warning")),
         event: ControllerEvent::BatteryWarning {
-            current: sample_controller(
-                BackendKind::GameInput,
-                BatteryReading::new(BatteryKind::Alkaline, BatteryCharge::Precise(percent)),
-            ),
             warning: BatteryWarning::precise(percent, level),
         },
     }
@@ -152,10 +142,6 @@ fn coarse_warning(coarse_level: BatteryLevel, level: BatteryWarningLevel) -> Pre
     PreviewEvent {
         label: warning_label(&level, format!("{coarse_level} coarse battery warning")),
         event: ControllerEvent::BatteryWarning {
-            current: sample_controller(
-                BackendKind::XInput,
-                BatteryReading::new(BatteryKind::Alkaline, BatteryCharge::Coarse(coarse_level)),
-            ),
             warning: BatteryWarning::coarse(coarse_level, level),
         },
     }
@@ -167,8 +153,8 @@ fn warning_label(level: &BatteryWarningLevel, detail: String) -> String {
     } else {
         "high priority"
     };
-    let audio = if level.sound_file().is_some() {
-        ", audio file"
+    let audio = if level.audio().is_some() {
+        ", audio"
     } else {
         ""
     };
@@ -176,12 +162,6 @@ fn warning_label(level: &BatteryWarningLevel, detail: String) -> String {
     format!("{}: {detail} ({urgency}{audio})", level.name())
 }
 
-fn sample_controller(battery_source: BackendKind, battery: BatteryReading) -> Controller {
-    Controller::new(
-        "notification-preview",
-        "Xbox Wireless Controller",
-        ControllerSource::GameInput,
-        battery,
-    )
-    .with_battery(battery_source, battery)
+fn sample_controller(battery: BatteryReading) -> Controller {
+    Controller::new("notification-preview", battery)
 }

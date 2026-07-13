@@ -66,8 +66,11 @@ impl Default for BatteryWarningPolicy {
 
 #[cfg(test)]
 mod tests {
-    use crate::controller::battery::{
-        BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarningLevel,
+    use crate::{
+        audio::AudioClip,
+        controller::battery::{
+            BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarningLevel,
+        },
     };
 
     use super::{BatteryWarning, BatteryWarningPolicy};
@@ -142,14 +145,14 @@ mod tests {
     }
 
     #[test]
-    fn warns_for_non_notifying_levels_with_sound_file() {
-        let policy = BatteryWarningPolicy::new(vec![BatteryWarningLevel::with_notify_and_file(
+    fn warns_for_non_notifying_levels_with_audio() {
+        let policy = BatteryWarningPolicy::new(vec![BatteryWarningLevel::with_notify_and_audio(
             "low",
             Some(40),
             Some(BatteryLevel::Low),
             false,
             false,
-            Some("low.wav".into()),
+            Some(AudioClip::file("low.wav")),
         )]);
 
         let warning = policy.warning_between(
@@ -161,13 +164,13 @@ mod tests {
             warning,
             Some(BatteryWarning::precise(
                 40,
-                BatteryWarningLevel::with_notify_and_file(
+                BatteryWarningLevel::with_notify_and_audio(
                     "low",
                     Some(40),
                     Some(BatteryLevel::Low),
                     false,
                     false,
-                    Some("low.wav".into()),
+                    Some(AudioClip::file("low.wav")),
                 )
             ))
         );
@@ -178,10 +181,16 @@ mod tests {
     }
 
     fn medium_level() -> BatteryWarningLevel {
-        BatteryWarningLevel::new("medium", Some(70), Some(BatteryLevel::Medium), false)
+        BatteryWarningLevel::with_notify(
+            "medium",
+            Some(70),
+            Some(BatteryLevel::Medium),
+            true,
+            false,
+        )
     }
 
     fn empty_level() -> BatteryWarningLevel {
-        BatteryWarningLevel::new("empty", Some(10), Some(BatteryLevel::Empty), true)
+        BatteryWarningLevel::with_notify("empty", Some(10), Some(BatteryLevel::Empty), true, true)
     }
 }

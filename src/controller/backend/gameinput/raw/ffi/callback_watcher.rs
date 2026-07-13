@@ -5,13 +5,13 @@ use crate::AppResult;
 use super::super::{
     GameInputEvent,
     constants::{
-        GAMEINPUT_BLOCKING_ENUMERATION, GAMEINPUT_CALLBACK_UNREGISTER_TIMEOUT_US,
-        GAMEINPUT_DEVICE_ANY_STATUS, GAMEINPUT_INVALID_CALLBACK_TOKEN_VALUE,
-        GAMEINPUT_KIND_GAMEPAD,
+        GAMEINPUT_BLOCKING_ENUMERATION, GAMEINPUT_DEVICE_ANY_STATUS,
+        GAMEINPUT_INVALID_CALLBACK_TOKEN_VALUE, GAMEINPUT_KIND_GAMEPAD,
     },
 };
 use super::{
-    abi::{IGameInput, IGameInputDevice, IGameInputReading},
+    abi::{IGameInputDevice, IGameInputReading},
+    callback_registration::unregister_callback,
     game_input::GameInputHandle,
     snapshot::{snapshot_from_callback, snapshot_from_reading},
 };
@@ -91,10 +91,13 @@ pub fn start_callback_watcher() -> AppResult<(CallbackWatcher, mpsc::Receiver<Ga
     };
 
     if reading_register_result.is_err() {
-        unsafe {
-            unregister_callback(game_input.raw(), device_token);
-            drop(Box::from_raw(context));
+        let can_drop_context = unsafe { unregister_callback(game_input.raw(), device_token) };
+        if can_drop_context {
+            unsafe {
+                drop(Box::from_raw(context));
+            }
         }
+
         return Err(format!(
             "RegisterReadingCallback failed: {:?}",
             reading_register_result
@@ -111,21 +114,6 @@ pub fn start_callback_watcher() -> AppResult<(CallbackWatcher, mpsc::Receiver<Ga
         },
         receiver,
     ))
-}
-
-unsafe fn unregister_callback(game_input: *mut IGameInput, token: u64) -> bool {
-    if token == GAMEINPUT_INVALID_CALLBACK_TOKEN_VALUE {
-        true
-    } else {
-        unsafe {
-            ((*(*game_input).vtbl).StopCallback)(game_input, token);
-            ((*(*game_input).vtbl).UnregisterCallback)(
-                game_input,
-                token,
-                GAMEINPUT_CALLBACK_UNREGISTER_TIMEOUT_US,
-            )
-        }
-    }
 }
 
 unsafe extern "system" fn watch_device_callback(

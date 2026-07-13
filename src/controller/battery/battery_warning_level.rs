@@ -1,6 +1,4 @@
-use std::path::{Path, PathBuf};
-
-use crate::controller::battery::BatteryLevel;
+use crate::{audio::AudioClip, controller::battery::BatteryLevel};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BatteryWarningLevel {
@@ -9,26 +7,10 @@ pub struct BatteryWarningLevel {
     coarse_level: Option<BatteryLevel>,
     notify: bool,
     urgent: bool,
-    sound_file: Option<PathBuf>,
+    audio: Option<AudioClip>,
 }
 
 impl BatteryWarningLevel {
-    pub fn new(
-        name: impl Into<String>,
-        precise_threshold_percent: Option<u8>,
-        coarse_level: Option<BatteryLevel>,
-        urgent: bool,
-    ) -> Self {
-        Self::with_notify_and_file(
-            name,
-            precise_threshold_percent,
-            coarse_level,
-            true,
-            urgent,
-            None,
-        )
-    }
-
     pub fn with_notify(
         name: impl Into<String>,
         precise_threshold_percent: Option<u8>,
@@ -36,7 +18,7 @@ impl BatteryWarningLevel {
         notify: bool,
         urgent: bool,
     ) -> Self {
-        Self::with_notify_and_file(
+        Self::with_notify_and_audio(
             name,
             precise_threshold_percent,
             coarse_level,
@@ -46,13 +28,13 @@ impl BatteryWarningLevel {
         )
     }
 
-    pub fn with_notify_and_file(
+    pub fn with_notify_and_audio(
         name: impl Into<String>,
         precise_threshold_percent: Option<u8>,
         coarse_level: Option<BatteryLevel>,
         notify: bool,
         urgent: bool,
-        sound_file: Option<PathBuf>,
+        audio: Option<AudioClip>,
     ) -> Self {
         Self {
             name: name.into(),
@@ -60,15 +42,11 @@ impl BatteryWarningLevel {
             coarse_level,
             notify,
             urgent,
-            sound_file,
+            audio,
         }
     }
 
     pub fn default_levels() -> Vec<Self> {
-        Self::default_levels_with_urgent_threshold(10)
-    }
-
-    pub fn default_levels_with_urgent_threshold(urgent_threshold_percent: u8) -> Vec<Self> {
         vec![
             Self::with_notify(
                 "full",
@@ -82,21 +60,21 @@ impl BatteryWarningLevel {
                 Some(BatteryLevel::Medium.estimated_percent()),
                 Some(BatteryLevel::Medium),
                 true,
-                BatteryLevel::Medium.estimated_percent() <= urgent_threshold_percent,
+                false,
             ),
             Self::with_notify(
                 "low",
                 Some(BatteryLevel::Low.estimated_percent()),
                 Some(BatteryLevel::Low),
                 true,
-                BatteryLevel::Low.estimated_percent() <= urgent_threshold_percent,
+                false,
             ),
             Self::with_notify(
                 "empty",
                 Some(BatteryLevel::Empty.estimated_percent()),
                 Some(BatteryLevel::Empty),
                 true,
-                BatteryLevel::Empty.estimated_percent() <= urgent_threshold_percent,
+                true,
             ),
         ]
     }
@@ -121,11 +99,11 @@ impl BatteryWarningLevel {
         self.urgent
     }
 
-    pub fn sound_file(&self) -> Option<&Path> {
-        self.sound_file.as_deref()
+    pub fn audio(&self) -> Option<&AudioClip> {
+        self.audio.as_ref()
     }
 
     pub fn has_action(&self) -> bool {
-        self.notify || self.sound_file.is_some()
+        self.notify || self.audio.is_some()
     }
 }

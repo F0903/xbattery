@@ -1,8 +1,7 @@
-use std::path::Path;
-
 use crate::{
+    audio::AudioClip,
     controller::{
-        Controller, ControllerSource,
+        Controller,
         battery::{
             BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning,
             BatteryWarningLevel,
@@ -75,7 +74,6 @@ fn disconnected_notifications_use_user_facing_copy() {
 #[test]
 fn precise_critical_battery_notifications_are_urgent() {
     let event = ControllerEvent::BatteryWarning {
-        current: controller(BatteryCharge::Precise(10)),
         warning: precise_warning(10, true),
     };
 
@@ -91,7 +89,6 @@ fn precise_critical_battery_notifications_are_urgent() {
 #[test]
 fn precise_battery_notifications_use_user_facing_copy() {
     let event = ControllerEvent::BatteryWarning {
-        current: controller(BatteryCharge::Precise(50)),
         warning: precise_warning(50, false),
     };
     let notification = event
@@ -106,7 +103,6 @@ fn precise_battery_notifications_use_user_facing_copy() {
 #[test]
 fn precise_noncritical_battery_notifications_are_high_priority() {
     let event = ControllerEvent::BatteryWarning {
-        current: controller(BatteryCharge::Precise(25)),
         warning: precise_warning(25, false),
     };
 
@@ -122,16 +118,15 @@ fn precise_noncritical_battery_notifications_are_high_priority() {
 #[test]
 fn battery_warning_notifications_can_be_disabled_per_level() {
     let event = ControllerEvent::BatteryWarning {
-        current: controller(BatteryCharge::Precise(25)),
         warning: BatteryWarning::precise(
             25,
-            BatteryWarningLevel::with_notify_and_file(
+            BatteryWarningLevel::with_notify_and_audio(
                 "low",
                 Some(25),
                 None,
                 false,
                 false,
-                Some("low.wav".into()),
+                Some(AudioClip::file("low.wav")),
             ),
         ),
     };
@@ -143,36 +138,34 @@ fn battery_warning_notifications_can_be_disabled_per_level() {
 }
 
 #[test]
-fn battery_warning_events_expose_configured_sound_file() {
+fn battery_warning_events_expose_configured_audio() {
     let event = ControllerEvent::BatteryWarning {
-        current: controller(BatteryCharge::Precise(25)),
         warning: BatteryWarning::precise(
             25,
-            BatteryWarningLevel::with_notify_and_file(
+            BatteryWarningLevel::with_notify_and_audio(
                 "low",
                 Some(25),
                 None,
                 false,
                 false,
-                Some("low.wav".into()),
+                Some(AudioClip::file("low.wav")),
             ),
         ),
     };
 
-    assert_eq!(event.sound_file(), Some(Path::new("low.wav")));
+    assert_eq!(event.audio(), Some(&AudioClip::file("low.wav")));
 }
 
 #[test]
-fn connectivity_events_do_not_expose_sound_files() {
+fn connectivity_events_do_not_expose_audio() {
     let event = ControllerEvent::Connected(controller(BatteryCharge::Coarse(BatteryLevel::Full)));
 
-    assert_eq!(event.sound_file(), None);
+    assert_eq!(event.audio(), None);
 }
 
 #[test]
 fn battery_warning_urgency_can_be_configured_per_level() {
     let event = ControllerEvent::BatteryWarning {
-        current: controller(BatteryCharge::Precise(20)),
         warning: precise_warning(20, true),
     };
 
@@ -188,7 +181,6 @@ fn battery_warning_urgency_can_be_configured_per_level() {
 #[test]
 fn coarse_battery_notifications_use_user_facing_copy() {
     let event = ControllerEvent::BatteryWarning {
-        current: controller(BatteryCharge::Coarse(BatteryLevel::Medium)),
         warning: coarse_warning(BatteryLevel::Medium, false),
     };
     let notification = event
@@ -203,7 +195,6 @@ fn coarse_battery_notifications_use_user_facing_copy() {
 #[test]
 fn coarse_empty_battery_notifications_are_urgent() {
     let event = ControllerEvent::BatteryWarning {
-        current: controller(BatteryCharge::Coarse(BatteryLevel::Empty)),
         warning: coarse_warning(BatteryLevel::Empty, true),
     };
 
@@ -219,8 +210,6 @@ fn coarse_empty_battery_notifications_are_urgent() {
 fn controller(charge: BatteryCharge) -> Controller {
     Controller::new(
         "controller",
-        "Controller",
-        ControllerSource::XInput,
         BatteryReading::new(BatteryKind::Unknown, charge),
     )
 }
@@ -228,13 +217,13 @@ fn controller(charge: BatteryCharge) -> Controller {
 fn precise_warning(percent: u8, urgent: bool) -> BatteryWarning {
     BatteryWarning::precise(
         percent,
-        BatteryWarningLevel::new(format!("{percent}%"), Some(percent), None, urgent),
+        BatteryWarningLevel::with_notify(format!("{percent}%"), Some(percent), None, true, urgent),
     )
 }
 
 fn coarse_warning(level: BatteryLevel, urgent: bool) -> BatteryWarning {
     BatteryWarning::coarse(
         level,
-        BatteryWarningLevel::new(level.to_string(), None, Some(level), urgent),
+        BatteryWarningLevel::with_notify(level.to_string(), None, Some(level), true, urgent),
     )
 }

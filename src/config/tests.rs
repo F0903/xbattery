@@ -1,6 +1,6 @@
-use std::{fs, path::Path, path::PathBuf, time::SystemTime};
+use std::{fs, path::PathBuf, time::SystemTime};
 
-use crate::controller::battery::BatteryLevel;
+use crate::{audio::AudioClip, controller::battery::BatteryLevel};
 
 use super::AppConfig;
 
@@ -19,7 +19,6 @@ fn parses_partial_config_with_defaults() {
     assert!(config.notifications.notify_disconnected);
     assert_eq!(config.monitor.poll_interval_seconds, 60);
     assert!(config.battery.levels.is_none());
-    assert_eq!(config.battery.precise_warning_thresholds, None);
     assert_eq!(config.updates.repo_name, "xbattery");
     assert!(config.updates.check_automatically);
     assert_eq!(config.updates.check_interval_hours, 24);
@@ -70,13 +69,13 @@ fn parses_battery_level_config() {
     )
     .unwrap();
 
-    let levels = config.battery.warning_levels(None);
+    let levels = config.battery.warning_levels().unwrap();
 
     assert_eq!(levels.len(), 2);
     assert_eq!(levels[0].name(), "empty");
     assert_eq!(levels[0].precise_threshold_percent(), Some(15));
     assert_eq!(levels[0].coarse_level(), Some(BatteryLevel::Empty));
-    assert_eq!(levels[0].sound_file(), Some(Path::new("sounds/empty.wav")));
+    assert!(matches!(levels[0].audio(), Some(AudioClip::WavBytes(_))));
     assert!(levels[0].urgent());
     assert_eq!(levels[1].name(), "medium");
     assert_eq!(levels[1].precise_threshold_percent(), Some(55));
@@ -101,19 +100,19 @@ fn load_from_path_resolves_relative_battery_level_sound_files() {
     .unwrap();
 
     let config = AppConfig::load_from_path(&config_path).unwrap();
-    let levels = config.battery.warning_levels(None);
+    let levels = config.battery.warning_levels().unwrap();
     let low = levels.iter().find(|level| level.name() == "low").unwrap();
 
     assert_eq!(
-        low.sound_file(),
-        Some(temp_dir.join("sounds/low.wav").as_path())
+        low.audio(),
+        Some(&AudioClip::file(temp_dir.join("sounds/low.wav")))
     );
 
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
-fn load_from_path_generates_relative_battery_level_sound_files() {
+fn warning_levels_builds_generated_battery_level_audio() {
     let temp_dir = unique_temp_dir("xbattery-generated-config-test");
     fs::create_dir_all(&temp_dir).unwrap();
 
@@ -139,29 +138,20 @@ fn load_from_path_generates_relative_battery_level_sound_files() {
     .unwrap();
 
     let config = AppConfig::load_from_path(&config_path).unwrap();
-    let levels = config.battery.warning_levels(None);
+    let levels = config.battery.warning_levels().unwrap();
     let low = levels.iter().find(|level| level.name() == "low").unwrap();
-    let generated_file = temp_dir.join("sounds/low.wav");
 
-    assert_eq!(low.sound_file(), Some(generated_file.as_path()));
-    assert!(fs::read(generated_file).unwrap().starts_with(b"RIFF"));
+    match low.audio().unwrap() {
+        AudioClip::WavBytes(bytes) => assert!(bytes.starts_with(b"RIFF")),
+        AudioClip::File(path) => panic!("expected generated audio, got {}", path.display()),
+    }
 
     fs::remove_dir_all(temp_dir).unwrap();
 }
 
 #[test]
-fn default_battery_levels_use_legacy_urgent_threshold_when_present() {
-    let config = toml::from_str::<AppConfig>(
-        r#"
-        [notifications]
-        urgent_precise_threshold_percent = 25
-        "#,
-    )
-    .unwrap();
-
-    let levels = config
-        .battery
-        .warning_levels(config.notifications.urgent_precise_threshold_percent);
+fn default_battery_levels_have_fixed_urgency() {
+    let levels = AppConfig::default().battery.warning_levels().unwrap();
 
     let medium = levels
         .iter()
@@ -177,35 +167,6 @@ fn default_battery_levels_use_legacy_urgent_threshold_when_present() {
     assert!(!medium.urgent());
     assert!(!low.urgent());
     assert!(empty.urgent());
-}
-
-#[test]
-fn parses_legacy_precise_warning_thresholds() {
-    let config = toml::from_str::<AppConfig>(
-        r#"
-        [battery]
-        precise_warning_thresholds = [60, 30, 15]
-        "#,
-    )
-    .unwrap();
-
-    let levels = config.battery.warning_levels(None);
-
-    assert!(
-        levels
-            .iter()
-            .any(|level| level.precise_threshold_percent() == Some(60))
-    );
-    assert!(
-        levels
-            .iter()
-            .any(|level| level.precise_threshold_percent() == Some(30))
-    );
-    assert!(
-        levels
-            .iter()
-            .any(|level| level.precise_threshold_percent() == Some(15))
-    );
 }
 
 #[test]
@@ -270,7 +231,6 @@ fn rejects_battery_level_with_sound_file_and_generated_sound() {
         sound_file = "low.wav"
 
         [battery.levels.low.generated_sound]
-        file = "generated-low.wav"
         "#,
     )
     .unwrap();
@@ -292,7 +252,6 @@ fn rejects_generated_tone_without_frequencies() {
         threshold_percent = 40
 
         [battery.levels.low.generated_sound]
-        file = "sounds/low.wav"
 
         [[battery.levels.low.generated_sound.segments]]
         kind = "tone"
@@ -430,36 +389,6 @@ fn rejects_generated_reverb_room_above_limit() {
     let error = config.validate().unwrap_err();
 
     assert!(error.to_string().contains("room_seconds"));
-}
-
-#[test]
-fn rejects_removed_generated_sound_preset_config() {
-    let error = toml::from_str::<AppConfig>(
-        r#"
-        [battery.levels.low]
-        threshold_percent = 40
-
-        [battery.levels.low.generated_sound]
-        preset = "low"
-        "#,
-    )
-    .unwrap_err();
-
-    assert!(error.to_string().contains("preset"));
-}
-
-#[test]
-fn rejects_removed_toast_sound_config() {
-    let error = toml::from_str::<AppConfig>(
-        r#"
-        [battery.levels.low]
-        threshold_percent = 40
-        sound = "alarm"
-        "#,
-    )
-    .unwrap_err();
-
-    assert!(error.to_string().contains("sound"));
 }
 
 #[test]

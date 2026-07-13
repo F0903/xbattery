@@ -41,7 +41,6 @@ pub(super) fn snapshot_from_callback(
 
     GameInputDeviceSnapshot {
         id: format!("gameinput:{:p}", device),
-        name: "GameInput controller".to_string(),
         timestamp,
         current_status,
         previous_status,

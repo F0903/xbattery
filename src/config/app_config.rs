@@ -50,22 +50,11 @@ impl AppConfig {
         self.battery.resolve_relative_paths(base_dir);
     }
 
-    pub fn generate_configured_sounds(&self) -> AppResult<Vec<PathBuf>> {
-        self.battery.generate_sounds()
-    }
-
-    pub fn generated_sound_files(&self) -> Vec<PathBuf> {
-        self.battery.generated_sound_files()
-    }
-
     pub fn controller_service_config(&self) -> AppResult<ControllerServiceConfig> {
         Ok(ControllerServiceConfig::new(
             self.monitor.poll_interval(),
             self.monitor.control_wait_slice(),
-            BatteryWarningPolicy::new(
-                self.battery
-                    .warning_levels(self.notifications.urgent_precise_threshold_percent),
-            ),
+            BatteryWarningPolicy::new(self.battery.warning_levels()?),
             ControllerNotificationPolicy::new().with_connectivity_notifications(
                 self.notifications.notify_connected,
                 self.notifications.notify_disconnected,

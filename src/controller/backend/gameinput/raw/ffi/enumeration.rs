@@ -5,13 +5,13 @@ use crate::AppResult;
 use super::super::{
     GameInputDeviceSnapshot,
     constants::{
-        GAMEINPUT_BLOCKING_ENUMERATION, GAMEINPUT_CALLBACK_UNREGISTER_TIMEOUT_US,
-        GAMEINPUT_DEVICE_ANY_STATUS, GAMEINPUT_INVALID_CALLBACK_TOKEN_VALUE,
-        GAMEINPUT_KIND_GAMEPAD,
+        GAMEINPUT_BLOCKING_ENUMERATION, GAMEINPUT_DEVICE_ANY_STATUS,
+        GAMEINPUT_INVALID_CALLBACK_TOKEN_VALUE, GAMEINPUT_KIND_GAMEPAD,
     },
 };
 use super::{
     abi::{IGameInput, IGameInputDevice},
+    callback_registration::unregister_callback,
     game_input::GameInputHandle,
     snapshot::snapshot_from_callback,
 };
@@ -29,9 +29,9 @@ pub fn enumerate_gamepad_snapshots() -> AppResult<Vec<GameInputDeviceSnapshot>> 
 unsafe fn enumerate_with_game_input(
     game_input: *mut IGameInput,
 ) -> AppResult<Vec<GameInputDeviceSnapshot>> {
-    let mut context = EnumerationContext {
+    let context = Box::into_raw(Box::new(EnumerationContext {
         snapshots: Vec::new(),
-    };
+    }));
     let mut token = GAMEINPUT_INVALID_CALLBACK_TOKEN_VALUE;
     let register_result = unsafe {
         ((*(*game_input).vtbl).RegisterDeviceCallback)(
@@ -40,26 +40,25 @@ unsafe fn enumerate_with_game_input(
             GAMEINPUT_KIND_GAMEPAD,
             GAMEINPUT_DEVICE_ANY_STATUS,
             GAMEINPUT_BLOCKING_ENUMERATION,
-            &mut context as *mut EnumerationContext as *mut c_void,
+            context.cast::<c_void>(),
             Some(enumeration_callback),
             &mut token,
         )
     };
 
     if register_result.is_err() {
+        unsafe {
+            drop(Box::from_raw(context));
+        }
         return Err(format!("RegisterDeviceCallback failed: {:?}", register_result).into());
     }
 
-    if token != GAMEINPUT_INVALID_CALLBACK_TOKEN_VALUE {
-        unsafe {
-            ((*(*game_input).vtbl).UnregisterCallback)(
-                game_input,
-                token,
-                GAMEINPUT_CALLBACK_UNREGISTER_TIMEOUT_US,
-            );
-        }
+    if !unsafe { unregister_callback(game_input, token) } {
+        // An in-flight callback still owns this pointer. Leaking it is the only safe option.
+        return Err("UnregisterCallback timed out during GameInput enumeration".into());
     }
 
+    let context = unsafe { Box::from_raw(context) };
     Ok(context.snapshots)
 }
 

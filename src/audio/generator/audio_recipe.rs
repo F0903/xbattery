@@ -14,10 +14,6 @@ pub struct AudioRecipe {
 }
 
 impl AudioRecipe {
-    pub fn new(sample_rate: u32, segments: Vec<AudioSegment>) -> Self {
-        Self::with_segments_and_effects(sample_rate, segments, Vec::new())
-    }
-
     pub fn with_segments_and_effects(
         sample_rate: u32,
         segments: Vec<AudioSegment>,

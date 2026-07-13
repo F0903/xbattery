@@ -6,9 +6,3 @@ pub struct XInputDiagnosticReport {
     pub packet_number: Option<u32>,
     pub battery: Option<BatteryReading>,
 }
-
-impl XInputDiagnosticReport {
-    pub fn is_connected(self) -> bool {
-        self.packet_number.is_some()
-    }
-}

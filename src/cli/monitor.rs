@@ -32,9 +32,10 @@ pub(super) fn run() -> AppResult<()> {
 
             if let Some(config_watcher) = &config_watcher {
                 while let Ok(config) = config_watcher.try_recv() {
+                    let service_config = config.controller_service_config()?;
                     notifier.set_config(config.toast_config())?;
                     update_handle.update_config(config.updates.clone())?;
-                    latest = Some(config.controller_service_config()?);
+                    latest = Some(service_config);
                 }
             }
 

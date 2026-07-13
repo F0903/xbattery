@@ -14,10 +14,6 @@ pub struct ControllerMonitor {
 }
 
 impl ControllerMonitor {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn with_warning_policy(warning_policy: BatteryWarningPolicy) -> Self {
         Self {
             previous: Vec::new(),
@@ -51,10 +47,7 @@ impl ControllerMonitor {
                 Some(index) => {
                     if let Some(warning) = self.warning_between(&self.previous[index], &controller)
                     {
-                        events.push(ControllerEvent::BatteryWarning {
-                            current: controller.clone(),
-                            warning,
-                        });
+                        events.push(ControllerEvent::BatteryWarning { warning });
                     }
 
                     self.previous[index] = controller;
@@ -92,10 +85,7 @@ impl ControllerMonitor {
                 None => events.push(ControllerEvent::Connected(controller.clone())),
                 Some(previous) => {
                     if let Some(warning) = self.warning_between(previous, controller) {
-                        events.push(ControllerEvent::BatteryWarning {
-                            current: controller.clone(),
-                            warning,
-                        });
+                        events.push(ControllerEvent::BatteryWarning { warning });
                     }
                 }
             }
@@ -123,7 +113,7 @@ impl ControllerMonitor {
 #[cfg(test)]
 mod tests {
     use crate::controller::{
-        Controller, ControllerSource,
+        Controller,
         battery::{
             BatteryCharge, BatteryKind, BatteryLevel, BatteryReading, BatteryWarning,
             BatteryWarningLevel,
@@ -135,7 +125,7 @@ mod tests {
 
     #[test]
     fn emits_connected_event_for_new_controller() {
-        let mut monitor = ControllerMonitor::new();
+        let mut monitor = ControllerMonitor::default();
         let controller = controller("one", BatteryCharge::Coarse(BatteryLevel::Full));
 
         let events = monitor.observe_current(vec![controller.clone()]);
@@ -145,7 +135,7 @@ mod tests {
 
     #[test]
     fn emits_disconnected_event_for_missing_controller() {
-        let mut monitor = ControllerMonitor::new();
+        let mut monitor = ControllerMonitor::default();
         let controller = controller("one", BatteryCharge::Coarse(BatteryLevel::Full));
         monitor.observe_current(vec![controller.clone()]);
 
@@ -156,31 +146,31 @@ mod tests {
 
     #[test]
     fn emits_battery_warning_for_decreasing_coarse_level() {
-        let mut monitor = ControllerMonitor::new();
+        let mut monitor = ControllerMonitor::default();
         let full = controller("one", BatteryCharge::Coarse(BatteryLevel::Full));
         let medium = controller("one", BatteryCharge::Coarse(BatteryLevel::Medium));
         monitor.observe_current(vec![full]);
 
-        let events = monitor.observe_current(vec![medium.clone()]);
+        let events = monitor.observe_current(vec![medium]);
 
         assert_eq!(
             events,
             vec![ControllerEvent::BatteryWarning {
-                current: medium,
                 warning: BatteryWarning::coarse(
                     BatteryLevel::Medium,
-                    BatteryWarningLevel::new("medium", Some(70), Some(BatteryLevel::Medium), false,),
+                    BatteryWarningLevel::with_notify(
+                        "medium",
+                        Some(70),
+                        Some(BatteryLevel::Medium),
+                        true,
+                        false,
+                    ),
                 ),
             }]
         );
     }
 
     fn controller(id: &str, charge: BatteryCharge) -> Controller {
-        Controller::new(
-            id,
-            "Controller",
-            ControllerSource::XInput,
-            BatteryReading::new(BatteryKind::Unknown, charge),
-        )
+        Controller::new(id, BatteryReading::new(BatteryKind::Unknown, charge))
     }
 }

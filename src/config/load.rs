@@ -53,6 +53,5 @@ pub(super) fn load_from_path(path: impl AsRef<Path>) -> AppResult<AppConfig> {
 
     config.resolve_relative_paths(path.parent());
     config.validate()?;
-    config.generate_configured_sounds()?;
     Ok(config)
 }

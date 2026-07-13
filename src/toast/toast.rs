@@ -17,23 +17,6 @@ pub struct Toast {
 }
 
 impl Toast {
-    pub fn new(title: impl Into<String>, body: impl Into<String>) -> Self {
-        Self::with_config_and_urgency(
-            ToastConfig::default(),
-            title,
-            body,
-            NotificationUrgency::Normal,
-        )
-    }
-
-    pub fn with_urgency(
-        title: impl Into<String>,
-        body: impl Into<String>,
-        urgency: NotificationUrgency,
-    ) -> Self {
-        Self::with_config_and_urgency(ToastConfig::default(), title, body, urgency)
-    }
-
     pub fn with_config(
         config: ToastConfig,
         title: impl Into<String>,

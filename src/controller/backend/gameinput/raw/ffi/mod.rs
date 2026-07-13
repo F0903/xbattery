@@ -1,4 +1,5 @@
 mod abi;
+mod callback_registration;
 mod callback_watcher;
 mod enumeration;
 mod game_input;

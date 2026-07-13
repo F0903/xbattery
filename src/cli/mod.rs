@@ -1,4 +1,4 @@
-mod args;
+#[cfg(debug_assertions)]
 mod audio;
 mod command;
 #[cfg(debug_assertions)]
@@ -14,13 +14,12 @@ use clap::Parser;
 use xbattery::{AppResult, launch_context::LaunchContext};
 
 use self::{
-    args::argv,
     command::{Cli, Command},
     help::print_help,
 };
 
 pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
-    let cli = Cli::parse_from(argv(args));
+    let cli = Cli::parse_from(std::iter::once("xbattery".to_owned()).chain(args));
 
     match cli.command {
         None if LaunchContext::current().is_likely_explorer_launch() => {
@@ -35,7 +34,6 @@ pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
         Some(Command::CheckUpdate) => update::check(),
         Some(Command::Update { dry_run }) => update::run(dry_run),
         Some(Command::Monitor) => monitor::run(),
-        Some(Command::GenerateSounds) => audio::generate_sounds(),
         #[cfg(debug_assertions)]
         Some(Command::Probe) => diagnostics::probe(),
         #[cfg(debug_assertions)]
@@ -48,8 +46,6 @@ pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
         Some(Command::ToastTestHigh) => toast::test_high(),
         #[cfg(debug_assertions)]
         Some(Command::ToastTestUrgent) => toast::test_urgent(),
-        #[cfg(debug_assertions)]
-        Some(Command::AudioFileTest { path }) => audio::test_file(path),
         #[cfg(debug_assertions)]
         Some(Command::ConfigAudioTest) => audio::test_config(),
         #[cfg(debug_assertions)]

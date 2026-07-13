@@ -6,9 +6,3 @@ pub struct ControllerSnapshot {
     pub packet_number: u32,
     pub battery: BatteryReading,
 }
-
-impl ControllerSnapshot {
-    pub fn name(self) -> String {
-        format!("Controller {}", self.slot + 1)
-    }
-}

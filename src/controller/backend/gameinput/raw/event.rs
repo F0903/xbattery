@@ -15,12 +15,6 @@ impl GameInputEvent {
         Self::Reading(snapshot)
     }
 
-    pub fn snapshot(&self) -> &GameInputDeviceSnapshot {
-        match self {
-            Self::Device(snapshot) | Self::Reading(snapshot) => snapshot,
-        }
-    }
-
     pub fn into_snapshot(self) -> GameInputDeviceSnapshot {
         match self {
             Self::Device(snapshot) | Self::Reading(snapshot) => snapshot,

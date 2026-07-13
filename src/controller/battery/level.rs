@@ -20,10 +20,6 @@ impl BatteryLevel {
             Self::Empty => 10,
         }
     }
-
-    pub fn is_warning_level(self) -> bool {
-        !matches!(self, Self::Full)
-    }
 }
 
 impl fmt::Display for BatteryLevel {

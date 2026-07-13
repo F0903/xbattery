@@ -8,17 +8,16 @@ use serde::Deserialize;
 use crate::{
     AppResult,
     audio::{
-        AudioEffect, AudioGenerator, AudioLayer, AudioRecipe, AudioSegment, DEFAULT_SAMPLE_RATE,
-        Waveform,
+        AudioClip, AudioEffect, AudioEnvelope, AudioLayer, AudioRecipe, AudioSegment,
+        DEFAULT_SAMPLE_RATE, Waveform, render_wav_clip,
     },
     controller::battery::{BatteryLevel, BatteryWarningLevel},
 };
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct BatteryConfig {
     pub levels: Option<BTreeMap<String, BatteryLevelConfig>>,
-    pub precise_warning_thresholds: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -35,7 +34,6 @@ pub struct BatteryLevelConfig {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct AudioRecipeConfig {
-    pub file: Option<PathBuf>,
     pub sample_rate: Option<u32>,
     pub segments: Vec<AudioSegmentConfig>,
     pub layers: Vec<AudioLayerConfig>,
@@ -107,25 +105,13 @@ pub enum AudioEffectKind {
 }
 
 impl BatteryConfig {
-    pub fn warning_levels(
-        &self,
-        legacy_urgent_threshold_percent: Option<u8>,
-    ) -> Vec<BatteryWarningLevel> {
-        if let Some(thresholds) = &self.precise_warning_thresholds {
-            return legacy_warning_levels(
-                thresholds,
-                legacy_urgent_threshold_percent.unwrap_or(10),
-            );
-        }
-
+    pub fn warning_levels(&self) -> AppResult<Vec<BatteryWarningLevel>> {
         match &self.levels {
             Some(levels) => levels
                 .iter()
                 .map(|(name, config)| config.warning_level(name))
                 .collect(),
-            None => BatteryWarningLevel::default_levels_with_urgent_threshold(
-                legacy_urgent_threshold_percent.unwrap_or(10),
-            ),
+            None => Ok(BatteryWarningLevel::default_levels()),
         }
     }
 
@@ -138,102 +124,45 @@ impl BatteryConfig {
             return;
         };
 
-        for (name, level) in levels {
-            level.resolve_generated_sound_file(name);
-
+        for level in levels.values_mut() {
             if let Some(sound_file) = &mut level.sound_file
                 && !sound_file.as_os_str().is_empty()
                 && sound_file.is_relative()
             {
                 *sound_file = base_dir.join(&sound_file);
             }
-
-            if let Some(generated_sound) = &mut level.generated_sound
-                && let Some(file) = &mut generated_sound.file
-                && !file.as_os_str().is_empty()
-                && file.is_relative()
-            {
-                *file = base_dir.join(&file);
-            }
         }
-    }
-
-    pub(super) fn generate_sounds(&self) -> AppResult<Vec<PathBuf>> {
-        let mut generated = Vec::new();
-
-        let Some(levels) = &self.levels else {
-            return Ok(generated);
-        };
-
-        let generator = AudioGenerator::new();
-
-        for (name, level) in levels {
-            let Some(sound) = &level.generated_sound else {
-                continue;
-            };
-
-            let path = sound.file_for_level(name);
-            let recipe = sound.recipe(name)?;
-            generator.write_wav(&path, &recipe)?;
-            generated.push(path);
-        }
-
-        Ok(generated)
-    }
-
-    pub fn generated_sound_files(&self) -> Vec<PathBuf> {
-        self.levels
-            .iter()
-            .flat_map(|levels| levels.iter())
-            .filter_map(|(name, level)| {
-                level
-                    .generated_sound
-                    .as_ref()
-                    .map(|sound| sound.file_for_level(name))
-            })
-            .collect()
     }
 }
 
 impl BatteryLevelConfig {
-    pub fn warning_level(&self, name: &str) -> BatteryWarningLevel {
-        BatteryWarningLevel::with_notify_and_file(
+    fn warning_level(&self, name: &str) -> AppResult<BatteryWarningLevel> {
+        Ok(BatteryWarningLevel::with_notify_and_audio(
             name,
             self.threshold_percent,
             self.coarse_level,
             self.notify.unwrap_or(true),
             self.urgent,
-            self.effective_sound_file(name),
-        )
+            self.audio_clip(name)?,
+        ))
     }
 
-    pub fn effective_sound_file(&self, name: &str) -> Option<PathBuf> {
-        self.sound_file.clone().or_else(|| {
-            self.generated_sound
-                .as_ref()
-                .map(|sound| sound.file_for_level(name))
-        })
-    }
+    fn audio_clip(&self, name: &str) -> AppResult<Option<AudioClip>> {
+        if let Some(sound_file) = &self.sound_file {
+            return Ok(Some(AudioClip::file(sound_file.clone())));
+        }
 
-    fn resolve_generated_sound_file(&mut self, name: &str) {
-        let Some(sound) = &mut self.generated_sound else {
-            return;
+        let Some(generated_sound) = &self.generated_sound else {
+            return Ok(None);
         };
 
-        if sound.file.is_none() {
-            sound.file = Some(PathBuf::from("sounds").join(format!("{name}.wav")));
-        }
+        let recipe = generated_sound.recipe(name)?;
+        render_wav_clip(&recipe).map(Some)
     }
 }
 
 impl AudioRecipeConfig {
-    pub fn file_for_level(&self, name: &str) -> PathBuf {
-        self.file
-            .clone()
-            .unwrap_or_else(|| PathBuf::from("sounds").join(format!("{name}.wav")))
-    }
-
-    pub fn recipe(&self, level_name: &str) -> AppResult<AudioRecipe> {
+    fn recipe(&self, level_name: &str) -> AppResult<AudioRecipe> {
         let sample_rate = self.sample_rate.unwrap_or(DEFAULT_SAMPLE_RATE);
         let effects = self
             .effects
@@ -271,7 +200,7 @@ impl AudioRecipeConfig {
 }
 
 impl AudioSegmentConfig {
-    pub fn segment(&self) -> AudioSegment {
+    fn segment(&self) -> AudioSegment {
         match self.kind {
             AudioSegmentKind::Tone => AudioSegment::Tone {
                 frequencies: self.frequencies.clone(),
@@ -286,23 +215,29 @@ impl AudioSegmentConfig {
 }
 
 impl AudioLayerConfig {
-    pub fn layer(&self) -> AudioLayer {
-        AudioLayer::with_decay_envelope(
+    fn layer(&self) -> AudioLayer {
+        AudioLayer::with_audio_envelope(
             self.waveform.waveform(),
             self.frequencies.clone(),
             self.start_seconds.unwrap_or(0.0),
             self.duration_seconds,
             self.volume.unwrap_or(0.2),
-            self.attack_seconds.unwrap_or(0.008),
-            self.decay_seconds.unwrap_or(0.0),
-            self.sustain_level.unwrap_or(1.0),
-            self.release_seconds.unwrap_or(0.028),
+            AudioEnvelope::new(
+                self.attack_seconds
+                    .unwrap_or(AudioEnvelope::DEFAULT_ATTACK_SECONDS),
+                self.decay_seconds
+                    .unwrap_or(AudioEnvelope::DEFAULT_DECAY_SECONDS),
+                self.sustain_level
+                    .unwrap_or(AudioEnvelope::DEFAULT_SUSTAIN_LEVEL),
+                self.release_seconds
+                    .unwrap_or(AudioEnvelope::DEFAULT_RELEASE_SECONDS),
+            ),
         )
     }
 }
 
 impl WaveformConfig {
-    pub fn waveform(self) -> Waveform {
+    fn waveform(self) -> Waveform {
         match self {
             Self::Sine => Waveform::Sine,
             Self::Triangle => Waveform::Triangle,
@@ -313,7 +248,7 @@ impl WaveformConfig {
 }
 
 impl AudioEffectConfig {
-    pub fn effect(&self) -> AudioEffect {
+    fn effect(&self) -> AudioEffect {
         match self.kind {
             AudioEffectKind::LowPass => AudioEffect::LowPass {
                 cutoff_hz: self.cutoff_hz.unwrap_or(1_600.0),
@@ -333,52 +268,4 @@ impl AudioEffectConfig {
             },
         }
     }
-}
-
-impl Default for BatteryConfig {
-    fn default() -> Self {
-        Self {
-            levels: None,
-            precise_warning_thresholds: None,
-        }
-    }
-}
-
-fn legacy_warning_levels(
-    thresholds: &[u8],
-    urgent_threshold_percent: u8,
-) -> Vec<BatteryWarningLevel> {
-    let mut thresholds = thresholds.to_vec();
-    thresholds.sort_unstable_by(|left, right| right.cmp(left));
-    thresholds.dedup();
-
-    let mut levels = thresholds
-        .into_iter()
-        .map(|threshold| {
-            BatteryWarningLevel::with_notify(
-                format!("{threshold}%"),
-                Some(threshold),
-                None,
-                true,
-                threshold <= urgent_threshold_percent,
-            )
-        })
-        .collect::<Vec<_>>();
-
-    levels.extend(
-        BatteryWarningLevel::default_levels_with_urgent_threshold(urgent_threshold_percent)
-            .into_iter()
-            .map(|level| {
-                BatteryWarningLevel::with_notify_and_file(
-                    level.name(),
-                    None,
-                    level.coarse_level(),
-                    level.notify(),
-                    level.urgent(),
-                    level.sound_file().map(PathBuf::from),
-                )
-            }),
-    );
-
-    levels
 }

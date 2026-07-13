@@ -4,60 +4,28 @@ use crate::{AppResult, audio, notifier::Notifier};
 
 use super::{ControllerServiceConfig, run_state::RunState};
 use crate::controller::{
-    backend::{
-        BackendEvent, BackendEventStream, BatteryBackend, EventBackend, GameInputBackend,
-        InputBackend, XInputBackend,
-    },
+    backend::{GameInputBackend, GameInputEvent, GameInputEventStream, XInputBackend},
     event::ControllerEvent,
     monitor::ControllerMonitor,
 };
 
-pub struct ControllerService<N: Notifier, I = GameInputBackend, B = XInputBackend> {
+pub struct ControllerService<N: Notifier> {
     pub(super) monitor: ControllerMonitor,
-    pub(super) input: I,
-    pub(super) battery: B,
+    pub(super) input: GameInputBackend,
+    pub(super) battery: XInputBackend,
     pub(super) notifier: N,
     pub(super) config: ControllerServiceConfig,
 }
 
-impl<N: Notifier> ControllerService<N, GameInputBackend, XInputBackend> {
+impl<N: Notifier> ControllerService<N> {
     pub fn new(notifier: N, config: ControllerServiceConfig) -> Self {
-        Self::with_providers(
-            notifier,
-            config,
-            GameInputBackend::new(),
-            XInputBackend::new(),
-        )
-    }
-}
-
-impl<N, I, B> ControllerService<N, I, B>
-where
-    N: Notifier,
-    I: InputBackend + EventBackend,
-    B: BatteryBackend,
-{
-    pub fn with_providers(
-        notifier: N,
-        config: ControllerServiceConfig,
-        input: I,
-        battery: B,
-    ) -> Self {
         Self {
             monitor: ControllerMonitor::with_warning_policy(config.warning_policy().clone()),
-            input,
-            battery,
+            input: GameInputBackend,
+            battery: XInputBackend,
             notifier,
             config,
         }
-    }
-
-    pub fn run_until_ctrl_c(&mut self) -> AppResult<()> {
-        self.run_until_ctrl_c_or(|| false)
-    }
-
-    pub fn run_until_ctrl_c_or(&mut self, should_stop: impl Fn() -> bool) -> AppResult<()> {
-        self.run_until_ctrl_c_or_reconfigure(should_stop, || Ok(None))
     }
 
     pub fn run_until_ctrl_c_or_reconfigure(
@@ -84,13 +52,13 @@ where
         Ok(())
     }
 
-    pub fn apply_config(&mut self, config: ControllerServiceConfig) {
+    fn apply_config(&mut self, config: ControllerServiceConfig) {
         self.monitor
             .set_warning_policy(config.warning_policy().clone());
         self.config = config;
     }
 
-    pub(super) fn apply_pending_config(
+    fn apply_pending_config(
         &mut self,
         next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
     ) -> AppResult<()> {
@@ -105,7 +73,7 @@ where
         &mut self,
         run_state: &RunState,
         should_stop: &impl Fn() -> bool,
-        stream: BackendEventStream,
+        stream: GameInputEventStream,
         next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
     ) -> AppResult<()> {
         while run_state.active(should_stop) {
@@ -177,7 +145,7 @@ where
         self.notify_events(events)
     }
 
-    fn process_backend_event(&mut self, event: BackendEvent) -> AppResult<()> {
+    fn process_backend_event(&mut self, event: GameInputEvent) -> AppResult<()> {
         let (controller, is_connected) = self.input.controller_from_event(event);
         let controller = self.battery.attach_to_one(controller);
         let events = self.monitor.observe_incremental(controller, is_connected);
@@ -198,15 +166,12 @@ where
     }
 
     fn play_event_sound(&self, event: &ControllerEvent) {
-        let Some(sound_file) = event.sound_file() else {
+        let Some(audio_clip) = event.audio() else {
             return;
         };
 
-        if let Err(error) = audio::play_file(sound_file) {
-            eprintln!(
-                "failed to play configured audio file {}: {error}",
-                sound_file.display()
-            );
+        if let Err(error) = audio::play(audio_clip) {
+            eprintln!("configured audio playback failed: {error}");
         }
     }
 }

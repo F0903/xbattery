@@ -10,13 +10,11 @@ pub fn raw_controller_reports() -> AppResult<Vec<RawControllerReport>> {
 
     for index in 0..controllers.Size()? {
         let controller = controllers.GetAt(index)?;
-        let id = controller.NonRoamableId()?.to_string();
         let display_name = controller.DisplayName()?.to_string();
         let (remaining_mwh, full_charge_mwh, percent) =
             battery_capacity(controller.TryGetBatteryReport()?);
 
         reports.push(RawControllerReport {
-            id,
             display_name,
             vendor_id: controller.HardwareVendorId()?,
             product_id: controller.HardwareProductId()?,

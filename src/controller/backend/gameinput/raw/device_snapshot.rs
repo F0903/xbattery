@@ -8,7 +8,6 @@ use super::{
 #[derive(Clone, Debug)]
 pub struct GameInputDeviceSnapshot {
     pub id: String,
-    pub name: String,
     pub timestamp: u64,
     pub current_status: i32,
     pub previous_status: i32,
