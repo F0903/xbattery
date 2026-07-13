@@ -4,7 +4,6 @@ use super::TASK_NAME;
 
 #[derive(Clone, Debug)]
 pub struct InstallReport {
-    pub install_dir: PathBuf,
     pub installed_exe: PathBuf,
     pub installed_config: PathBuf,
     pub started_monitor: bool,

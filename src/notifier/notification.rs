@@ -1,4 +1,9 @@
-use super::NotificationUrgency;
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NotificationUrgency {
+    Normal,
+    High,
+    Urgent,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Notification {

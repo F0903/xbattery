@@ -53,7 +53,6 @@ impl StartupInstaller {
         };
 
         Ok(InstallReport {
-            install_dir: self.paths.install_dir.clone(),
             installed_exe: self.paths.installed_exe.clone(),
             installed_config: self.paths.installed_config.clone(),
             started_monitor,

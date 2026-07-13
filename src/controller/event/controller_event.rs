@@ -61,10 +61,15 @@ fn disconnected_body(battery: BatteryReading) -> String {
 }
 
 fn battery_level_text(battery: BatteryReading) -> Option<String> {
+    if battery.kind == BatteryKind::Wired {
+        return Some("wired".to_string());
+    }
+
     match battery.charge {
         BatteryCharge::Precise(percent) => Some(format!("{percent}%")),
-        BatteryCharge::Coarse(level) => Some(format!("~{}%", level.estimated_percent())),
-        BatteryCharge::Unknown if battery.kind == BatteryKind::Wired => Some("wired".to_string()),
+        BatteryCharge::Coarse(level) => level
+            .estimated_percent()
+            .map(|percent| format!("~{percent}%")),
         BatteryCharge::Unknown => None,
     }
 }

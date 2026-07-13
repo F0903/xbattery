@@ -139,7 +139,7 @@ impl BatteryConfig {
 
 impl BatteryLevelConfig {
     fn warning_level(&self, name: &str) -> AppResult<BatteryWarningLevel> {
-        Ok(BatteryWarningLevel::with_notify_and_audio(
+        Ok(BatteryWarningLevel::new(
             name,
             self.threshold_percent,
             self.coarse_level,

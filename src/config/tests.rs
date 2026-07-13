@@ -219,6 +219,22 @@ fn rejects_battery_level_without_matcher() {
 }
 
 #[test]
+fn rejects_unknown_as_a_configured_warning_level() {
+    let config = toml::from_str::<AppConfig>(
+        r#"
+        [battery.levels.unknown]
+        coarse_level = "unknown"
+        "#,
+    )
+    .unwrap();
+
+    let error = config.validate().unwrap_err();
+
+    assert!(error.to_string().contains("coarse_level"));
+    assert!(error.to_string().contains("empty, low, medium, or full"));
+}
+
+#[test]
 fn rejects_duplicate_battery_level_thresholds() {
     let config = toml::from_str::<AppConfig>(
         r#"

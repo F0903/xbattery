@@ -1,4 +1,4 @@
-use xbattery::{
+use crate::{
     AppResult,
     config::{self, AppConfig},
     controller::service::ControllerService,
@@ -15,12 +15,11 @@ pub(super) fn run() -> AppResult<()> {
     };
 
     let stop_event = NamedEvent::open_or_create(BACKGROUND_INSTANCE_STOP_EVENT_NAME)?;
-    stop_event.reset()?;
 
     let loaded_config = AppConfig::load_with_source()?;
     let config_watcher = loaded_config.path.map(config::watch_config);
     let config = loaded_config.config;
-    let notifier = ToastNotifier::new(config.toast_config());
+    let notifier = ToastNotifier::new(config.notifications.app_id.clone());
     let reload_notifier = notifier.clone();
     let update_handle = update::start_background_checks(config.updates.clone(), notifier.clone())?;
 
@@ -33,7 +32,7 @@ pub(super) fn run() -> AppResult<()> {
             if let Some(config_watcher) = &config_watcher {
                 while let Ok(config) = config_watcher.try_recv() {
                     let service_config = config.controller_service_config()?;
-                    notifier.set_config(config.toast_config())?;
+                    notifier.set_app_id(config.notifications.app_id.clone())?;
                     update_handle.update_config(config.updates.clone())?;
                     latest = Some(service_config);
                 }

@@ -1,17 +1,19 @@
 use crate::controller::battery::BatteryReading;
 
-use super::{
-    GameInputBatteryState, battery_state::battery_status_description,
-    constants::GAMEINPUT_DEVICE_CONNECTED,
-};
+use super::constants::GAMEINPUT_DEVICE_CONNECTED;
+#[cfg(debug_assertions)]
+use super::{GameInputBatteryState, battery_state::battery_status_description};
 
 #[derive(Clone, Debug)]
 pub struct GameInputDeviceSnapshot {
     pub id: String,
+    #[cfg(debug_assertions)]
     pub timestamp: u64,
     pub current_status: i32,
+    #[cfg(debug_assertions)]
     pub previous_status: i32,
     pub battery: BatteryReading,
+    #[cfg(debug_assertions)]
     pub raw_battery: GameInputBatteryState,
 }
 
@@ -20,19 +22,23 @@ impl GameInputDeviceSnapshot {
         self.current_status & GAMEINPUT_DEVICE_CONNECTED != 0
     }
 
+    #[cfg(debug_assertions)]
     pub fn current_status_description(&self) -> String {
         status_description(self.current_status)
     }
 
+    #[cfg(debug_assertions)]
     pub fn previous_status_description(&self) -> String {
         status_description(self.previous_status)
     }
 
+    #[cfg(debug_assertions)]
     pub fn battery_status_description(&self) -> &'static str {
         battery_status_description(self.raw_battery.status)
     }
 }
 
+#[cfg(debug_assertions)]
 fn status_description(status: i32) -> String {
     let flags = [
         (0x0000_0001, "connected"),

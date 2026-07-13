@@ -7,7 +7,7 @@ use super::{
         AudioSegmentKind, resolve_notes,
     },
 };
-use crate::{AppResult, audio::generator::DEFAULT_SAMPLE_RATE};
+use crate::{AppResult, audio::generator::DEFAULT_SAMPLE_RATE, controller::battery::BatteryLevel};
 
 pub(super) fn validate(config: &AppConfig) -> AppResult<()> {
     if config.monitor.poll_interval_seconds == 0 {
@@ -88,12 +88,19 @@ fn validate_battery_config(config: &AppConfig) -> AppResult<()> {
             .into());
         }
 
-        if let Some(coarse) = level.coarse_level
-            && !coarse_levels.insert(coarse)
-        {
-            return Err(
-                format!("battery coarse level {coarse} is configured more than once").into(),
-            );
+        if let Some(coarse) = level.coarse_level {
+            if coarse == BatteryLevel::Unknown {
+                return Err(format!(
+                    "{level_path}.coarse_level must be empty, low, medium, or full"
+                )
+                .into());
+            }
+
+            if !coarse_levels.insert(coarse) {
+                return Err(
+                    format!("battery coarse level {coarse} is configured more than once").into(),
+                );
+            }
         }
 
         if level.sound_file.is_some() && level.generated_sound.is_some() {

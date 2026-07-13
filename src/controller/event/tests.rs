@@ -38,10 +38,20 @@ fn connected_notifications_use_user_facing_copy() {
 }
 
 #[test]
+fn connected_notifications_do_not_invent_a_percentage_for_unknown_levels() {
+    let event =
+        ControllerEvent::Connected(controller(BatteryCharge::Coarse(BatteryLevel::Unknown)));
+    let notification = event
+        .notification(&ControllerNotificationPolicy::default())
+        .unwrap();
+
+    assert_eq!(notification.body(), "Controller is connected");
+}
+
+#[test]
 fn connected_notifications_can_be_disabled() {
     let event = ControllerEvent::Connected(controller(BatteryCharge::Coarse(BatteryLevel::Full)));
-    let policy =
-        ControllerNotificationPolicy::default().with_connectivity_notifications(false, true);
+    let policy = ControllerNotificationPolicy::new(false, true);
 
     assert_eq!(event.notification(&policy), None);
 }
@@ -50,8 +60,7 @@ fn connected_notifications_can_be_disabled() {
 fn disconnected_notifications_can_be_disabled() {
     let event =
         ControllerEvent::Disconnected(controller(BatteryCharge::Coarse(BatteryLevel::Full)));
-    let policy =
-        ControllerNotificationPolicy::default().with_connectivity_notifications(true, false);
+    let policy = ControllerNotificationPolicy::new(true, false);
 
     assert_eq!(event.notification(&policy), None);
 }
@@ -120,7 +129,7 @@ fn battery_warning_notifications_can_be_disabled_per_level() {
     let event = ControllerEvent::BatteryWarning {
         warning: BatteryWarning::precise(
             25,
-            BatteryWarningLevel::with_notify_and_audio(
+            BatteryWarningLevel::new(
                 "low",
                 Some(25),
                 None,
@@ -142,7 +151,7 @@ fn battery_warning_events_expose_configured_audio() {
     let event = ControllerEvent::BatteryWarning {
         warning: BatteryWarning::precise(
             25,
-            BatteryWarningLevel::with_notify_and_audio(
+            BatteryWarningLevel::new(
                 "low",
                 Some(25),
                 None,
@@ -217,13 +226,20 @@ fn controller(charge: BatteryCharge) -> Controller {
 fn precise_warning(percent: u8, urgent: bool) -> BatteryWarning {
     BatteryWarning::precise(
         percent,
-        BatteryWarningLevel::with_notify(format!("{percent}%"), Some(percent), None, true, urgent),
+        BatteryWarningLevel::new(
+            format!("{percent}%"),
+            Some(percent),
+            None,
+            true,
+            urgent,
+            None,
+        ),
     )
 }
 
 fn coarse_warning(level: BatteryLevel, urgent: bool) -> BatteryWarning {
     BatteryWarning::coarse(
         level,
-        BatteryWarningLevel::with_notify(level.to_string(), None, Some(level), true, urgent),
+        BatteryWarningLevel::new(level.to_string(), None, Some(level), true, urgent, None),
     )
 }

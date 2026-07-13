@@ -1,6 +1,6 @@
 use std::{thread, time::Duration};
 
-use xbattery::{
+use crate::{
     AppResult,
     config::AppConfig,
     controller::{
@@ -11,48 +11,42 @@ use xbattery::{
         },
         event::{ControllerEvent, ControllerNotificationPolicy},
     },
-    notifier::{NotificationUrgency, Notifier, ToastNotifier},
-    toast::Toast,
+    notifier::{Notification, NotificationUrgency, Notifier, ToastNotifier},
 };
 
 const PREVIEW_DELAY: Duration = Duration::from_millis(900);
 
 pub(super) fn test() -> AppResult<()> {
-    let config = AppConfig::load()?;
-    Toast::with_config(
-        config.toast_config(),
-        "xbattery",
+    send_test(
         "Toast notifications are working.",
+        NotificationUrgency::Normal,
     )
-    .send()
 }
 
 pub(super) fn test_high() -> AppResult<()> {
-    let config = AppConfig::load()?;
-    Toast::with_config_and_urgency(
-        config.toast_config(),
-        "xbattery",
+    send_test(
         "High priority toast notifications are working.",
         NotificationUrgency::High,
     )
-    .send()
 }
 
 pub(super) fn test_urgent() -> AppResult<()> {
-    let config = AppConfig::load()?;
-    Toast::with_config_and_urgency(
-        config.toast_config(),
-        "xbattery",
+    send_test(
         "Urgent toast notifications are working.",
         NotificationUrgency::Urgent,
     )
-    .send()
+}
+
+fn send_test(body: &str, urgency: NotificationUrgency) -> AppResult<()> {
+    let config = AppConfig::load()?;
+    let notifier = ToastNotifier::new(config.notifications.app_id);
+    notifier.notify(&Notification::with_urgency("xbattery", body, urgency))
 }
 
 pub(super) fn preview() -> AppResult<()> {
     let config = AppConfig::load()?;
-    let policy = ControllerNotificationPolicy::new().with_connectivity_notifications(true, true);
-    let notifier = ToastNotifier::new(config.toast_config());
+    let policy = ControllerNotificationPolicy::default();
+    let notifier = ToastNotifier::new(config.notifications.app_id.clone());
     let warning_levels = config.battery.warning_levels()?;
     let previews = preview_events(&warning_levels);
 
@@ -115,14 +109,14 @@ fn preview_events(warning_levels: &[BatteryWarningLevel]) -> Vec<PreviewEvent> {
         .iter()
         .filter(|level| level.notify())
         .filter_map(|level| {
-            level
-                .coarse_level()
-                .map(|coarse_level| (coarse_level, level.clone()))
+            let coarse_level = level.coarse_level()?;
+            let percent = coarse_level.estimated_percent()?;
+            Some((percent, coarse_level, level.clone()))
         })
         .collect::<Vec<_>>();
-    coarse_levels.sort_by(|(left, _), (right, _)| right.cmp(left));
+    coarse_levels.sort_by(|(left, _, _), (right, _, _)| right.cmp(left));
 
-    for (coarse_level, level) in coarse_levels {
+    for (_, coarse_level, level) in coarse_levels {
         previews.push(coarse_warning(coarse_level, level));
     }
 

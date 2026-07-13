@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use xbattery::{
+use crate::{
     AppResult, dialog, elevate,
     startup::{StartupInstaller, StartupStatus, is_startup_access_denied},
 };

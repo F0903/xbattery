@@ -1,10 +1,11 @@
 mod notification;
-mod notification_urgency;
-#[path = "notifier.rs"]
-mod notifier_trait;
 mod toast_notifier;
 
-pub use notification::Notification;
-pub use notification_urgency::NotificationUrgency;
-pub use notifier_trait::Notifier;
+use crate::AppResult;
+
+pub use notification::{Notification, NotificationUrgency};
 pub use toast_notifier::ToastNotifier;
+
+pub trait Notifier {
+    fn notify(&self, notification: &Notification) -> AppResult<()>;
+}

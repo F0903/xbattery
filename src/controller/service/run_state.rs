@@ -10,7 +10,7 @@ pub(super) struct RunState {
 }
 
 impl RunState {
-    pub(super) fn with_ctrl_c() -> AppResult<Self> {
+    pub(super) fn new() -> AppResult<Self> {
         let running = Arc::new(AtomicBool::new(true));
         let running_signal = Arc::clone(&running);
 

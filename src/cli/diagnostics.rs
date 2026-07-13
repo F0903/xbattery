@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use xbattery::{
+use crate::{
     AppResult,
     controller::backend::{GameInputBackend, WinRTBackend, XInputBackend},
 };

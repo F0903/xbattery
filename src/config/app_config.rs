@@ -9,7 +9,6 @@ use crate::{
         battery::BatteryWarningPolicy, event::ControllerNotificationPolicy,
         service::ControllerServiceConfig,
     },
-    toast::ToastConfig,
 };
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -55,15 +54,11 @@ impl AppConfig {
             self.monitor.poll_interval(),
             self.monitor.control_wait_slice(),
             BatteryWarningPolicy::new(self.battery.warning_levels()?),
-            ControllerNotificationPolicy::new().with_connectivity_notifications(
+            ControllerNotificationPolicy::new(
                 self.notifications.notify_connected,
                 self.notifications.notify_disconnected,
             ),
         ))
-    }
-
-    pub fn toast_config(&self) -> ToastConfig {
-        ToastConfig::new(self.notifications.app_id.clone())
     }
 
     pub(super) fn validate(&self) -> AppResult<()> {

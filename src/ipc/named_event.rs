@@ -1,7 +1,7 @@
 use windows::{
     Win32::{
         Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0},
-        System::Threading::{CreateEventW, ResetEvent, SetEvent, WaitForSingleObject},
+        System::Threading::{CreateEventW, SetEvent, WaitForSingleObject},
     },
     core::HSTRING,
 };
@@ -18,14 +18,6 @@ impl NamedEvent {
         let handle = unsafe { CreateEventW(None, true, false, &name)? };
 
         Ok(Self { handle })
-    }
-
-    pub fn reset(&self) -> AppResult<()> {
-        unsafe {
-            ResetEvent(self.handle)?;
-        }
-
-        Ok(())
     }
 
     pub fn signal(&self) -> AppResult<()> {

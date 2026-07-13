@@ -1,4 +1,4 @@
-use xbattery::{AppResult, config::AppConfig, update};
+use crate::{AppResult, config::AppConfig, update};
 
 pub(super) fn check() -> AppResult<()> {
     let config = AppConfig::load()?;

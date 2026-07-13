@@ -29,9 +29,9 @@ pub(super) unsafe fn snapshot_from_reading(
 
 pub(super) fn snapshot_from_callback(
     device: *mut IGameInputDevice,
-    timestamp: u64,
+    _timestamp: u64,
     current_status: i32,
-    previous_status: i32,
+    _previous_status: i32,
 ) -> GameInputDeviceSnapshot {
     let battery = if device.is_null() {
         GameInputBatteryState::default()
@@ -41,10 +41,13 @@ pub(super) fn snapshot_from_callback(
 
     GameInputDeviceSnapshot {
         id: format!("gameinput:{:p}", device),
-        timestamp,
+        #[cfg(debug_assertions)]
+        timestamp: _timestamp,
         current_status,
-        previous_status,
+        #[cfg(debug_assertions)]
+        previous_status: _previous_status,
         battery: map_battery_state(battery),
+        #[cfg(debug_assertions)]
         raw_battery: battery,
     }
 }

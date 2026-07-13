@@ -12,21 +12,11 @@ pub struct ControllerNotificationPolicy {
 }
 
 impl ControllerNotificationPolicy {
-    pub fn new() -> Self {
+    pub fn new(notify_connected: bool, notify_disconnected: bool) -> Self {
         Self {
-            notify_connected: true,
-            notify_disconnected: true,
+            notify_connected,
+            notify_disconnected,
         }
-    }
-
-    pub fn with_connectivity_notifications(
-        mut self,
-        notify_connected: bool,
-        notify_disconnected: bool,
-    ) -> Self {
-        self.notify_connected = notify_connected;
-        self.notify_disconnected = notify_disconnected;
-        self
     }
 
     pub(in crate::controller::event) fn notify_connected(&self) -> bool {
@@ -49,7 +39,10 @@ impl ControllerNotificationPolicy {
             ),
             BatteryWarningReading::Coarse(level) => Notification::with_urgency(
                 BATTERY_STATUS_TITLE,
-                format!("Battery level is ~{}%", level.estimated_percent()),
+                level.estimated_percent().map_or_else(
+                    || "Battery level is unknown".to_string(),
+                    |percent| format!("Battery level is ~{percent}%"),
+                ),
                 warning_urgency(warning),
             ),
         }
@@ -58,7 +51,7 @@ impl ControllerNotificationPolicy {
 
 impl Default for ControllerNotificationPolicy {
     fn default() -> Self {
-        Self::new()
+        Self::new(true, true)
     }
 }
 

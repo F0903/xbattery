@@ -1,14 +1,14 @@
 use crate::{AppResult, controller::Controller};
 
-use super::{
-    GameInputDiagnosticSnapshot, GameInputDiagnosticStream, GameInputEvent, GameInputEventStream,
-    raw,
-};
+#[cfg(debug_assertions)]
+use super::{GameInputDiagnosticSnapshot, GameInputDiagnosticStream};
+use super::{GameInputEvent, GameInputEventStream, raw};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct GameInputBackend;
 
 impl GameInputBackend {
+    #[cfg(debug_assertions)]
     pub fn diagnostic_snapshots(&self) -> AppResult<Vec<GameInputDiagnosticSnapshot>> {
         Ok(raw::enumerate_gamepad_snapshots()?
             .into_iter()
@@ -16,6 +16,7 @@ impl GameInputBackend {
             .collect())
     }
 
+    #[cfg(debug_assertions)]
     pub fn start_diagnostic_event_stream(&self) -> AppResult<GameInputDiagnosticStream> {
         let (watcher, receiver) = raw::start_callback_watcher()?;
 

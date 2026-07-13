@@ -11,24 +11,7 @@ pub struct BatteryWarningLevel {
 }
 
 impl BatteryWarningLevel {
-    pub fn with_notify(
-        name: impl Into<String>,
-        precise_threshold_percent: Option<u8>,
-        coarse_level: Option<BatteryLevel>,
-        notify: bool,
-        urgent: bool,
-    ) -> Self {
-        Self::with_notify_and_audio(
-            name,
-            precise_threshold_percent,
-            coarse_level,
-            notify,
-            urgent,
-            None,
-        )
-    }
-
-    pub fn with_notify_and_audio(
+    pub fn new(
         name: impl Into<String>,
         precise_threshold_percent: Option<u8>,
         coarse_level: Option<BatteryLevel>,
@@ -36,8 +19,10 @@ impl BatteryWarningLevel {
         urgent: bool,
         audio: Option<AudioClip>,
     ) -> Self {
+        let name = name.into();
+
         Self {
-            name: name.into(),
+            name,
             precise_threshold_percent,
             coarse_level,
             notify,
@@ -48,33 +33,37 @@ impl BatteryWarningLevel {
 
     pub fn default_levels() -> Vec<Self> {
         vec![
-            Self::with_notify(
+            Self::new(
                 "full",
-                Some(BatteryLevel::Full.estimated_percent()),
+                BatteryLevel::Full.estimated_percent(),
                 Some(BatteryLevel::Full),
                 false,
                 false,
+                None,
             ),
-            Self::with_notify(
+            Self::new(
                 "medium",
-                Some(BatteryLevel::Medium.estimated_percent()),
+                BatteryLevel::Medium.estimated_percent(),
                 Some(BatteryLevel::Medium),
                 true,
                 false,
+                None,
             ),
-            Self::with_notify(
+            Self::new(
                 "low",
-                Some(BatteryLevel::Low.estimated_percent()),
+                BatteryLevel::Low.estimated_percent(),
                 Some(BatteryLevel::Low),
                 true,
                 false,
+                None,
             ),
-            Self::with_notify(
+            Self::new(
                 "empty",
-                Some(BatteryLevel::Empty.estimated_percent()),
+                BatteryLevel::Empty.estimated_percent(),
                 Some(BatteryLevel::Empty),
                 true,
                 true,
+                None,
             ),
         ]
     }

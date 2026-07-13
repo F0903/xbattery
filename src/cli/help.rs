@@ -1,5 +1,5 @@
+use crate::AppResult;
 use clap::CommandFactory;
-use xbattery::AppResult;
 
 use super::command::Cli;
 

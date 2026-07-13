@@ -10,21 +10,22 @@ mod monitor;
 mod toast;
 mod update;
 
+use crate::{AppResult, launch_context::LaunchContext};
 use clap::Parser;
-use xbattery::{AppResult, launch_context::LaunchContext};
 
 use self::{
     command::{Cli, Command},
     help::print_help,
 };
 
-pub fn run(args: impl IntoIterator<Item = String>) -> AppResult<()> {
+pub(super) fn run(
+    args: impl IntoIterator<Item = String>,
+    launch_context: &LaunchContext,
+) -> AppResult<()> {
     let cli = Cli::parse_from(std::iter::once("xbattery".to_owned()).chain(args));
 
     match cli.command {
-        None if LaunchContext::current().is_likely_explorer_launch() => {
-            install::install_interactive()
-        }
+        None if launch_context.is_likely_explorer_launch() => install::install_interactive(),
         None => print_help(None),
         Some(Command::Help { command }) => print_help(command.as_deref()),
         Some(Command::Install { force }) => install::install(false, force),

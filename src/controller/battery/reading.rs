@@ -11,11 +11,16 @@ impl BatteryReading {
         Self { kind, charge }
     }
 
+    #[cfg(debug_assertions)]
     pub fn description(self) -> String {
-        match (self.kind, self.charge) {
-            (BatteryKind::Wired, _) => "wired".to_string(),
-            (_, BatteryCharge::Unknown) => self.kind.to_string(),
-            (_, charge) => charge.description(),
+        if self.kind == BatteryKind::Wired {
+            return "wired".to_string();
         }
+
+        if self.charge.is_unknown() {
+            return self.kind.to_string();
+        }
+
+        self.charge.description()
     }
 }

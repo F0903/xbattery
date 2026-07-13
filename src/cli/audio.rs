@@ -1,6 +1,6 @@
 use std::{thread, time::Duration};
 
-use xbattery::{AppResult, audio, config::AppConfig, controller::battery::BatteryWarningLevel};
+use crate::{AppResult, audio, config::AppConfig, controller::battery::BatteryWarningLevel};
 
 const SOUND_TEST_PAUSE: Duration = Duration::from_millis(150);
 
@@ -50,7 +50,9 @@ pub(super) fn test_config() -> AppResult<()> {
 }
 
 fn level_sort_percent(level: &BatteryWarningLevel) -> Option<u8> {
-    level
-        .precise_threshold_percent()
-        .or_else(|| level.coarse_level().map(|level| level.estimated_percent()))
+    level.precise_threshold_percent().or_else(|| {
+        level
+            .coarse_level()
+            .and_then(|level| level.estimated_percent())
+    })
 }

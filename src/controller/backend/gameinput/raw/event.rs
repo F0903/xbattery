@@ -21,6 +21,7 @@ impl GameInputEvent {
         }
     }
 
+    #[cfg(debug_assertions)]
     pub fn source_label(&self) -> &'static str {
         match self {
             Self::Device(_) => "device",
