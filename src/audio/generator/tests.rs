@@ -1,14 +1,11 @@
-use crate::audio::AudioClip;
-
 use super::{
     AudioEffect, AudioEnvelope, AudioLayer, AudioRecipe, AudioSegment, DEFAULT_SAMPLE_RATE,
-    Waveform,
-    audio_generator::{render_samples, render_wav_clip},
+    Waveform, render,
 };
 
 #[test]
-fn generates_layered_wav() {
-    let clip = render_wav_clip(&AudioRecipe::with_layers(
+fn renders_layered_audio() {
+    let audio = render(&AudioRecipe::with_layers(
         DEFAULT_SAMPLE_RATE,
         vec![
             AudioLayer::with_audio_envelope(
@@ -42,15 +39,11 @@ fn generates_layered_wav() {
             },
             AudioEffect::SoftLimiter { drive: 1.2 },
         ],
-    ))
-    .unwrap();
-    let AudioClip::WavBytes(bytes) = clip else {
-        panic!("expected generated WAV bytes");
-    };
+    ));
 
-    assert!(bytes.starts_with(b"RIFF"));
-    assert_eq!(&bytes[8..12], b"WAVE");
-    assert_eq!(&bytes[12..16], b"fmt ");
+    assert_eq!(audio.sample_rate(), DEFAULT_SAMPLE_RATE);
+    assert_eq!(audio.channels(), 1);
+    assert!(audio.samples().iter().any(|sample| *sample != 0.0));
 }
 
 #[test]
@@ -71,15 +64,17 @@ fn reverb_adds_audible_tail_after_dry_sound() {
             mix: 0.65,
         }],
     );
-    let dry_samples = render_samples(&dry_sound);
-    let wet_samples = render_samples(&wet_sound);
+    let dry_audio = render(&dry_sound);
+    let wet_audio = render(&wet_sound);
+    let dry_samples = dry_audio.samples();
+    let wet_samples = wet_audio.samples();
 
     let tail_peak = wet_samples[dry_samples.len()..]
         .iter()
-        .map(|sample| i32::from(*sample).abs())
-        .max()
+        .map(|sample| sample.abs())
+        .reduce(f32::max)
         .unwrap();
 
     assert!(wet_samples.len() > dry_samples.len());
-    assert!(tail_peak > 256);
+    assert!(tail_peak > 0.005);
 }

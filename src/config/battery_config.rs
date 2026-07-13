@@ -8,8 +8,13 @@ use serde::Deserialize;
 use crate::{
     AppResult,
     audio::{
-        AudioClip, AudioEffect, AudioEnvelope, AudioLayer, AudioRecipe, AudioSegment,
-        DEFAULT_SAMPLE_RATE, Waveform, note_frequency, render_wav_clip,
+        AudioClip, AudioEngine,
+        encoding::Pcm16,
+        formats::Wav,
+        generator::{
+            AudioEffect, AudioEnvelope, AudioLayer, AudioRecipe, AudioSegment, DEFAULT_SAMPLE_RATE,
+            Waveform, note_frequency,
+        },
     },
     controller::battery::{BatteryLevel, BatteryWarningLevel},
 };
@@ -154,7 +159,8 @@ impl BatteryLevelConfig {
         };
 
         let recipe = generated_sound.recipe(name)?;
-        render_wav_clip(&recipe).map(Some)
+        let wav = AudioEngine::new(Wav::new(Pcm16)).render(&recipe)?;
+        Ok(Some(AudioClip::wav_bytes(wav)))
     }
 }
 

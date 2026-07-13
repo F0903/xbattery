@@ -1,11 +1,14 @@
+//! Audio pipeline: typed recipes become [`rendered::RenderedAudio`], sample encodings quantize that
+//! signal, and output formats package the resulting bytes for playback or export.
+
 mod audio_clip;
-mod generator;
+pub mod encoding;
+mod engine;
+pub mod formats;
+pub mod generator;
 mod playback;
+pub mod rendered;
 
 pub use audio_clip::AudioClip;
-pub(crate) use generator::note_frequency;
-pub use generator::{
-    AudioEffect, AudioEnvelope, AudioLayer, AudioRecipe, AudioSegment, DEFAULT_SAMPLE_RATE,
-    Waveform, render_wav_clip,
-};
+pub use engine::AudioEngine;
 pub use playback::{play, play_blocking};

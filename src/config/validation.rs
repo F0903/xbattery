@@ -7,7 +7,7 @@ use super::{
         AudioSegmentKind, resolve_notes,
     },
 };
-use crate::{AppResult, audio::DEFAULT_SAMPLE_RATE};
+use crate::{AppResult, audio::generator::DEFAULT_SAMPLE_RATE};
 
 pub(super) fn validate(config: &AppConfig) -> AppResult<()> {
     if config.monitor.poll_interval_seconds == 0 {

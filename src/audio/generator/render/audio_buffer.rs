@@ -45,7 +45,7 @@ impl AudioBuffer {
         effects::apply(&mut self.values, self.sample_rate, effect);
     }
 
-    pub(crate) fn into_samples(self) -> Vec<i16> {
-        self.values.into_iter().map(sample_math::pcm_i16).collect()
+    pub(crate) fn into_samples(self) -> Vec<f32> {
+        self.values
     }
 }
