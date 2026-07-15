@@ -15,6 +15,10 @@ impl GameInputEvent {
         Self::Reading(snapshot)
     }
 
+    pub fn is_device_event(&self) -> bool {
+        matches!(self, Self::Device(_))
+    }
+
     pub fn into_snapshot(self) -> GameInputDeviceSnapshot {
         match self {
             Self::Device(snapshot) | Self::Reading(snapshot) => snapshot,

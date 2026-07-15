@@ -1,9 +1,6 @@
 use crate::{
     AppResult,
-    controller::{
-        Controller,
-        battery::{BatteryKind, BatteryReading},
-    },
+    controller::{Controller, battery::BatteryReading},
 };
 
 #[cfg(debug_assertions)]
@@ -68,10 +65,7 @@ fn attach_when_unambiguous(
         .into_iter()
         .zip(readings)
         .map(|(controller, reading)| {
-            if reading.kind != BatteryKind::Wired
-                && reading.charge.is_unknown()
-                && !controller.battery().charge.is_unknown()
-            {
+            if reading.charge.is_unknown() && !controller.battery().charge.is_unknown() {
                 controller
             } else {
                 controller.with_battery(reading)
@@ -99,6 +93,17 @@ mod tests {
     }
 
     #[test]
+    fn wireless_xinput_replaces_gameinput_battery_not_present() {
+        let unknown = BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Unknown);
+        let controllers = vec![Controller::new("one", unknown)];
+        let wireless = reading(BatteryLevel::Medium);
+
+        let controllers = attach_when_unambiguous(controllers, vec![wireless]);
+
+        assert_eq!(controllers[0].battery(), wireless);
+    }
+
+    #[test]
     fn leaves_controllers_unchanged_when_reading_count_differs() {
         let controllers = vec![Controller::new("one", reading(BatteryLevel::Full))];
 
@@ -119,8 +124,20 @@ mod tests {
     }
 
     #[test]
-    fn wired_xinput_data_overrides_a_spurious_gameinput_charge() {
-        let controllers = vec![Controller::new("one", reading(BatteryLevel::Empty))];
+    fn wired_xinput_data_does_not_override_a_known_gameinput_charge() {
+        let known = BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Precise(70));
+        let controllers = vec![Controller::new("one", known)];
+        let wired = BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown);
+
+        let controllers = attach_when_unambiguous(controllers, vec![wired]);
+
+        assert_eq!(controllers[0].battery(), known);
+    }
+
+    #[test]
+    fn wired_xinput_data_identifies_a_controller_without_battery_evidence() {
+        let unknown = BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Unknown);
+        let controllers = vec![Controller::new("one", unknown)];
         let wired = BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown);
 
         let controllers = attach_when_unambiguous(controllers, vec![wired]);

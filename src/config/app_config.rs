@@ -2,7 +2,10 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use super::{BatteryConfig, MonitorConfig, NotificationsConfig, UpdatesConfig, load, validation};
+use super::{
+    BatteryConfig, ConfigIssue, ConfigWatchEvents, MonitorConfig, NotificationsConfig,
+    UpdatesConfig, load, validation,
+};
 use crate::{
     AppResult,
     controller::{
@@ -24,11 +27,20 @@ pub struct AppConfig {
 pub struct LoadedAppConfig {
     pub config: AppConfig,
     pub path: Option<PathBuf>,
+    pub issue: Option<ConfigIssue>,
 }
 
 impl LoadedAppConfig {
-    pub(super) fn new(config: AppConfig, path: Option<PathBuf>) -> Self {
-        Self { config, path }
+    pub(super) fn new(
+        config: AppConfig,
+        path: Option<PathBuf>,
+        issue: Option<ConfigIssue>,
+    ) -> Self {
+        Self {
+            config,
+            path,
+            issue,
+        }
     }
 }
 
@@ -37,8 +49,13 @@ impl AppConfig {
         load::load()
     }
 
+    #[cfg(debug_assertions)]
     pub fn load_with_source() -> AppResult<LoadedAppConfig> {
         load::load_with_source()
+    }
+
+    pub(crate) fn load_for_monitor() -> AppResult<(LoadedAppConfig, Option<ConfigWatchEvents>)> {
+        load::load_for_monitor()
     }
 
     pub fn load_from_path(path: impl AsRef<Path>) -> AppResult<Self> {

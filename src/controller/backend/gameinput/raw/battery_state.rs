@@ -30,8 +30,10 @@ impl Default for GameInputBatteryState {
 
 pub(super) fn map_battery_state(state: GameInputBatteryState) -> BatteryReading {
     match state.status {
+        // Battery presence does not identify the device's connection transport.
+        // XInput provides an explicit wired type when that distinction is known.
         GAMEINPUT_BATTERY_NOT_PRESENT => {
-            BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown)
+            BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Unknown)
         }
         GAMEINPUT_BATTERY_DISCHARGING | GAMEINPUT_BATTERY_IDLE | GAMEINPUT_BATTERY_CHARGING => {
             let charge = precise_percent(state)
@@ -102,7 +104,7 @@ mod tests {
         );
         assert_eq!(
             map_battery_state(absent),
-            BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown)
+            BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Unknown)
         );
     }
 
