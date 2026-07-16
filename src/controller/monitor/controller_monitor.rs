@@ -120,14 +120,7 @@ impl ControllerMonitor {
         self.defer_due_confirmations_at(Instant::now());
     }
 
-    pub fn observe_incremental(
-        &mut self,
-        controller: Controller,
-        is_connected: bool,
-    ) -> Vec<ControllerEvent> {
-        self.observe_incremental_at(controller, is_connected, Instant::now())
-    }
-
+    #[cfg(test)]
     fn observe_incremental_at(
         &mut self,
         controller: Controller,
@@ -875,6 +868,42 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_observations_confirm_a_persistent_wired_transition() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let full = Controller::new(
+            "one",
+            BatteryReading::new(
+                BatteryKind::Alkaline,
+                BatteryCharge::Coarse(BatteryLevel::Full),
+            ),
+        );
+        let wired = Controller::new(
+            "one",
+            BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown),
+        );
+        monitor.observe_current_at(vec![full], now);
+        let first_wired = now + Duration::from_secs(1);
+
+        assert!(
+            monitor
+                .observe_current_at(vec![wired.clone()], first_wired)
+                .is_empty()
+        );
+        let confirmed_at = first_wired + READING_CONFIRMATION_DELAY;
+        assert!(
+            monitor
+                .observe_current_at(vec![wired.clone()], confirmed_at)
+                .is_empty()
+        );
+        assert_eq!(monitor.next_confirmation_delay_at(confirmed_at), None);
+        assert_eq!(
+            monitor.observe_current_at(Vec::new(), confirmed_at + Duration::from_secs(1)),
+            vec![ControllerEvent::Disconnected(wired)]
+        );
+    }
+
+    #[test]
     fn coarse_low_readings_keep_the_existing_confirmation_behavior() {
         let now = Instant::now();
         let mut monitor = ControllerMonitor::default();
@@ -1143,6 +1172,25 @@ mod tests {
     }
 
     #[test]
+    fn repeated_refresh_errors_eventually_abandon_the_candidate() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        monitor.observe_incremental_at(controller("one", BatteryCharge::Precise(10)), true, now);
+
+        for attempt in 1..=MAX_DEFERRED_REFRESHES + 1 {
+            let refresh_at = now + READING_CONFIRMATION_DELAY * u32::from(attempt);
+            monitor.defer_due_confirmations_at(refresh_at);
+        }
+
+        assert_eq!(
+            monitor.next_confirmation_delay_at(
+                now + READING_CONFIRMATION_DELAY * u32::from(MAX_DEFERRED_REFRESHES + 1),
+            ),
+            None
+        );
+    }
+
+    #[test]
     fn observed_low_samples_reset_the_missing_snapshot_streak() {
         let now = Instant::now();
         let mut monitor = ControllerMonitor::default();
@@ -1171,25 +1219,6 @@ mod tests {
         assert_eq!(
             monitor.observe_pending_at(vec![critical], confirmed_at),
             vec![critical_warning()]
-        );
-    }
-
-    #[test]
-    fn repeated_refresh_errors_eventually_abandon_the_candidate() {
-        let now = Instant::now();
-        let mut monitor = ControllerMonitor::default();
-        monitor.observe_incremental_at(controller("one", BatteryCharge::Precise(10)), true, now);
-
-        for attempt in 1..=MAX_DEFERRED_REFRESHES + 1 {
-            let refresh_at = now + READING_CONFIRMATION_DELAY * u32::from(attempt);
-            monitor.defer_due_confirmations_at(refresh_at);
-        }
-
-        assert_eq!(
-            monitor.next_confirmation_delay_at(
-                now + READING_CONFIRMATION_DELAY * u32::from(MAX_DEFERRED_REFRESHES + 1),
-            ),
-            None
         );
     }
 

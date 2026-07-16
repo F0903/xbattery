@@ -12,4 +12,3 @@ pub use diagnostic_snapshot::GameInputDiagnosticSnapshot;
 #[cfg(debug_assertions)]
 pub use diagnostic_stream::GameInputDiagnosticStream;
 pub(crate) use event_stream::GameInputEventStream;
-pub(crate) use raw::GameInputEvent;

@@ -4,7 +4,7 @@ mod win_rt;
 mod xinput;
 
 pub use gameinput::GameInputBackend;
-pub(crate) use gameinput::{GameInputEvent, GameInputEventStream};
+pub(crate) use gameinput::GameInputEventStream;
 #[cfg(debug_assertions)]
 pub use win_rt::WinRTBackend;
 pub use xinput::XInputBackend;

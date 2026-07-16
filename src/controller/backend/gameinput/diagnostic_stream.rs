@@ -7,13 +7,13 @@ use super::{GameInputDiagnosticSnapshot, raw};
 
 pub struct GameInputDiagnosticStream {
     _watcher: raw::CallbackWatcher,
-    receiver: Receiver<raw::GameInputEvent>,
+    receiver: Receiver<raw::GameInputDeviceSnapshot>,
 }
 
 impl GameInputDiagnosticStream {
     pub(super) fn new(
         watcher: raw::CallbackWatcher,
-        receiver: Receiver<raw::GameInputEvent>,
+        receiver: Receiver<raw::GameInputDeviceSnapshot>,
     ) -> Self {
         Self {
             _watcher: watcher,
@@ -27,6 +27,6 @@ impl GameInputDiagnosticStream {
     ) -> Result<GameInputDiagnosticSnapshot, RecvTimeoutError> {
         self.receiver
             .recv_timeout(timeout)
-            .map(GameInputDiagnosticSnapshot::from_event)
+            .map(GameInputDiagnosticSnapshot::from_snapshot)
     }
 }

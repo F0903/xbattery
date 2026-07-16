@@ -1,11 +1,9 @@
-use crate::{
-    AppResult,
-    controller::{Controller, battery::BatteryReading},
-};
+use crate::{AppResult, controller::Controller};
 
 #[cfg(debug_assertions)]
 use super::XInputDiagnosticReport;
 use super::native;
+use super::snapshot::ControllerSnapshot;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct XInputBackend;
@@ -31,137 +29,38 @@ impl XInputBackend {
             .collect())
     }
 
-    fn battery_readings() -> AppResult<Vec<BatteryReading>> {
+    pub(crate) fn poll_controllers(&self) -> AppResult<Vec<Controller>> {
         Ok(native::poll_controllers()?
             .into_iter()
             .flatten()
-            .map(|snapshot| snapshot.battery)
+            .map(controller_from_snapshot)
             .collect())
-    }
-
-    pub(crate) fn enrich_controllers(&self, controllers: Vec<Controller>) -> Vec<Controller> {
-        // GameInput device IDs cannot be correlated with XInput slots.
-        if controllers.len() != 1 {
-            return controllers;
-        }
-
-        let Ok(readings) = Self::battery_readings() else {
-            return controllers;
-        };
-
-        attach_when_unambiguous(controllers, readings)
     }
 }
 
-fn attach_when_unambiguous(
-    controllers: Vec<Controller>,
-    readings: Vec<BatteryReading>,
-) -> Vec<Controller> {
-    if controllers.len() != 1 || readings.len() != 1 {
-        return controllers;
-    }
-
-    controllers
-        .into_iter()
-        .zip(readings)
-        .map(|(controller, reading)| {
-            if reading.charge.is_unknown() && !controller.battery().charge.is_unknown() {
-                controller
-            } else {
-                controller.with_battery(reading)
-            }
-        })
-        .collect()
+fn controller_from_snapshot(snapshot: ControllerSnapshot) -> Controller {
+    Controller::new(format!("xinput:{}", snapshot.slot), snapshot.battery)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::controller::{
-        Controller,
-        battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading},
-    };
+    use crate::controller::battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading};
 
-    use super::attach_when_unambiguous;
+    use super::controller_from_snapshot;
+    use crate::controller::backend::xinput::snapshot::ControllerSnapshot;
 
     #[test]
-    fn attaches_matching_battery_readings() {
-        let controllers = vec![Controller::new("one", reading(BatteryLevel::Full))];
+    fn polling_identity_is_stable_per_xinput_slot() {
+        let battery = reading(BatteryLevel::Medium);
 
-        let controllers = attach_when_unambiguous(controllers, vec![reading(BatteryLevel::Medium)]);
+        let controller = controller_from_snapshot(ControllerSnapshot {
+            slot: 2,
+            packet_number: 123,
+            battery,
+        });
 
-        assert_eq!(controllers[0].battery(), reading(BatteryLevel::Medium));
-    }
-
-    #[test]
-    fn wireless_xinput_replaces_gameinput_battery_not_present() {
-        let unknown = BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Unknown);
-        let controllers = vec![Controller::new("one", unknown)];
-        let wireless = reading(BatteryLevel::Medium);
-
-        let controllers = attach_when_unambiguous(controllers, vec![wireless]);
-
-        assert_eq!(controllers[0].battery(), wireless);
-    }
-
-    #[test]
-    fn leaves_controllers_unchanged_when_reading_count_differs() {
-        let controllers = vec![Controller::new("one", reading(BatteryLevel::Full))];
-
-        let controllers = attach_when_unambiguous(controllers, Vec::new());
-
-        assert_eq!(controllers[0].battery(), reading(BatteryLevel::Full));
-    }
-
-    #[test]
-    fn does_not_replace_a_known_gameinput_charge_with_unknown_xinput_data() {
-        let known = reading(BatteryLevel::Full);
-        let controllers = vec![Controller::new("one", known)];
-        let unknown = BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Unknown);
-
-        let controllers = attach_when_unambiguous(controllers, vec![unknown]);
-
-        assert_eq!(controllers[0].battery(), known);
-    }
-
-    #[test]
-    fn wired_xinput_data_does_not_override_a_known_gameinput_charge() {
-        let known = BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Precise(70));
-        let controllers = vec![Controller::new("one", known)];
-        let wired = BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown);
-
-        let controllers = attach_when_unambiguous(controllers, vec![wired]);
-
-        assert_eq!(controllers[0].battery(), known);
-    }
-
-    #[test]
-    fn wired_xinput_data_identifies_a_controller_without_battery_evidence() {
-        let unknown = BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Unknown);
-        let controllers = vec![Controller::new("one", unknown)];
-        let wired = BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown);
-
-        let controllers = attach_when_unambiguous(controllers, vec![wired]);
-
-        assert_eq!(controllers[0].battery(), wired);
-    }
-
-    #[test]
-    fn does_not_pair_multiple_controllers_by_enumeration_order() {
-        let controllers = vec![
-            Controller::new("one", reading(BatteryLevel::Full)),
-            Controller::new("two", reading(BatteryLevel::Full)),
-        ];
-
-        let controllers = attach_when_unambiguous(
-            controllers,
-            vec![reading(BatteryLevel::Low), reading(BatteryLevel::Medium)],
-        );
-
-        assert!(
-            controllers
-                .iter()
-                .all(|controller| controller.battery() == reading(BatteryLevel::Full))
-        );
+        assert_eq!(controller.id(), "xinput:2");
+        assert_eq!(controller.battery(), battery);
     }
 
     fn reading(level: BatteryLevel) -> BatteryReading {

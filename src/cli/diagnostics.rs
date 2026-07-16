@@ -76,14 +76,6 @@ pub(super) fn gameinput_probe() -> AppResult<()> {
             event.current_status,
             event.previous_status
         );
-        println!(
-            "    battery: {}, status={}, remaining={}, full={}, charge_rate={}",
-            event.battery.description(),
-            event.battery_status,
-            event.remaining_capacity,
-            event.full_charge_capacity,
-            event.charge_rate
-        );
     }
 
     Ok(())
@@ -104,20 +96,8 @@ pub(super) fn gameinput_watch() -> AppResult<()> {
             Ok(event) => {
                 count += 1;
                 println!(
-                    "  {} callback {}: timestamp={}, current=[{}], previous=[{}]",
-                    event.source,
-                    count,
-                    event.timestamp,
-                    event.current_status,
-                    event.previous_status
-                );
-                println!(
-                    "    battery: {}, status={}, remaining={}, full={}, charge_rate={}",
-                    event.battery.description(),
-                    event.battery_status,
-                    event.remaining_capacity,
-                    event.full_charge_capacity,
-                    event.charge_rate
+                    "  device callback {}: timestamp={}, current=[{}], previous=[{}]",
+                    count, event.timestamp, event.current_status, event.previous_status
                 );
             }
             Err(RecvTimeoutError::Timeout) => {}

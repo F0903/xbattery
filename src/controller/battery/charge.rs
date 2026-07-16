@@ -3,6 +3,8 @@ use super::BatteryLevel;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BatteryCharge {
     Coarse(BatteryLevel),
+    // The policy model also supports backends that can supply exact percentages.
+    #[allow(dead_code)]
     Precise(u8),
     Unknown,
 }

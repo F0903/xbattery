@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     sync::mpsc::RecvTimeoutError,
     thread,
     time::{Duration, Instant},
@@ -9,16 +8,18 @@ use crate::{AppResult, audio, notifier::Notifier};
 
 use super::{ControllerServiceConfig, run_state::RunState};
 use crate::controller::{
-    Controller,
-    backend::{GameInputBackend, GameInputEvent, GameInputEventStream, XInputBackend},
+    backend::{GameInputBackend, GameInputEventStream, XInputBackend},
     event::ControllerEvent,
     monitor::ControllerMonitor,
 };
 
+const TOPOLOGY_SETTLE_DELAY: Duration = Duration::from_millis(250);
+const TOPOLOGY_SETTLE_ATTEMPTS: u8 = 3;
+
 pub struct ControllerService<N: Notifier> {
     pub(super) monitor: ControllerMonitor,
-    pub(super) input: GameInputBackend,
-    pub(super) battery: XInputBackend,
+    pub(super) events: GameInputBackend,
+    pub(super) snapshots: XInputBackend,
     pub(super) notifier: N,
     pub(super) config: ControllerServiceConfig,
 }
@@ -29,29 +30,17 @@ enum EventLoopExit {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum DueSnapshot {
-    Regular,
+enum DueRefresh {
+    Current,
     Confirmation,
-}
-
-struct PendingBackendEvent {
-    controller: Controller,
-    is_connected: bool,
-    is_device_event: bool,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum PostSnapshotDisposition {
-    Drop,
-    ConnectedMissingFallback,
 }
 
 impl<N: Notifier> ControllerService<N> {
     pub fn new(notifier: N, config: ControllerServiceConfig) -> Self {
         Self {
             monitor: ControllerMonitor::new(config.warning_policy().clone()),
-            input: GameInputBackend,
-            battery: XInputBackend,
+            events: GameInputBackend,
+            snapshots: XInputBackend,
             notifier,
             config,
         }
@@ -64,7 +53,7 @@ impl<N: Notifier> ControllerService<N> {
     ) -> AppResult<()> {
         let run_state = RunState::new()?;
 
-        match self.input.start_event_stream() {
+        match self.events.start_event_stream() {
             Ok(stream) => match self.run_backend_event_loop(
                 &run_state,
                 &should_stop,
@@ -110,69 +99,69 @@ impl<N: Notifier> ControllerService<N> {
         stream: GameInputEventStream,
         next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
     ) -> AppResult<EventLoopExit> {
-        if let Err(error) = self.poll_and_notify() {
-            eprintln!("initial controller snapshot failed: {error}");
-        }
-        let mut last_poll = Instant::now();
+        let initial_refresh_failed = !self.try_poll_and_notify("initial controller refresh failed");
+        let mut last_refresh = Instant::now();
+        let mut follow_up_refresh_at =
+            initial_refresh_failed.then(|| Instant::now() + TOPOLOGY_SETTLE_DELAY);
+        let mut follow_up_attempts_remaining = if initial_refresh_failed {
+            TOPOLOGY_SETTLE_ATTEMPTS
+        } else {
+            0
+        };
 
         while run_state.active(should_stop) {
             self.apply_pending_config(next_config)?;
             let regular_poll_delay = self
                 .config
                 .poll_interval()
-                .saturating_sub(last_poll.elapsed());
+                .saturating_sub(last_refresh.elapsed());
+            let follow_up_refresh_delay = follow_up_refresh_at
+                .map(|deadline| deadline.saturating_duration_since(Instant::now()));
             let wait_timeout = next_event_wait(
                 self.config.control_wait_slice(),
                 regular_poll_delay,
                 self.monitor.next_confirmation_delay(),
+                follow_up_refresh_delay,
             );
 
-            let event = match stream.recv_timeout(wait_timeout) {
-                Ok(event) => Some(self.pending_backend_event(event)),
-                Err(RecvTimeoutError::Timeout) => None,
+            let topology_changed = match stream.recv_timeout(wait_timeout) {
+                Ok(_) => true,
+                Err(RecvTimeoutError::Timeout) => false,
                 Err(RecvTimeoutError::Disconnected) => {
                     return Ok(EventLoopExit::StreamDisconnected);
                 }
             };
+            if topology_changed {
+                follow_up_refresh_at = Some(Instant::now() + TOPOLOGY_SETTLE_DELAY);
+                follow_up_attempts_remaining = TOPOLOGY_SETTLE_ATTEMPTS;
+            }
 
-            let regular_snapshot_due = last_poll.elapsed() >= self.config.poll_interval();
-            let confirmation_snapshot_due = self
+            let regular_refresh_due = last_refresh.elapsed() >= self.config.poll_interval();
+            let follow_up_refresh_due =
+                follow_up_refresh_at.is_some_and(|deadline| Instant::now() >= deadline);
+            let confirmation_refresh_due = self
                 .monitor
                 .next_confirmation_delay()
                 .is_some_and(|delay| delay.is_zero());
-            let regular_snapshot_ids =
-                match due_snapshot(regular_snapshot_due, confirmation_snapshot_due) {
-                    Some(DueSnapshot::Regular) => {
-                        let current_ids = match self.poll_and_notify() {
-                            Ok(current_ids) => Some(current_ids),
-                            Err(error) => {
-                                eprintln!("scheduled controller snapshot failed: {error}");
-                                self.monitor.defer_due_confirmations();
-                                None
-                            }
-                        };
-                        last_poll = Instant::now();
-                        current_ids
+            match due_refresh(
+                topology_changed || regular_refresh_due || follow_up_refresh_due,
+                confirmation_refresh_due,
+            ) {
+                Some(DueRefresh::Current) => {
+                    let refresh_succeeded = self.try_poll_and_notify("controller refresh failed");
+                    if follow_up_refresh_due {
+                        if refresh_succeeded || follow_up_attempts_remaining <= 1 {
+                            follow_up_refresh_at = None;
+                            follow_up_attempts_remaining = 0;
+                        } else {
+                            follow_up_attempts_remaining -= 1;
+                            follow_up_refresh_at = Some(Instant::now() + TOPOLOGY_SETTLE_DELAY);
+                        }
                     }
-                    Some(DueSnapshot::Confirmation) => {
-                        self.refresh_pending_confirmations();
-                        None
-                    }
-                    None => None,
-                };
-
-            if let Some(event) = event {
-                let refresh_topology = match regular_snapshot_ids.as_ref() {
-                    Some(current_ids) => match post_snapshot_disposition(&event, current_ids) {
-                        PostSnapshotDisposition::Drop => continue,
-                        PostSnapshotDisposition::ConnectedMissingFallback => false,
-                    },
-                    None => true,
-                };
-
-                if self.process_backend_event(event, refresh_topology) {
-                    last_poll = Instant::now();
+                    last_refresh = Instant::now();
                 }
+                Some(DueRefresh::Confirmation) => self.refresh_pending_confirmations(),
+                None => {}
             }
         }
 
@@ -186,7 +175,7 @@ impl<N: Notifier> ControllerService<N> {
         next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
     ) -> AppResult<()> {
         self.apply_pending_config(next_config)?;
-        self.poll_and_notify()?;
+        self.try_poll_and_notify("initial controller refresh failed");
 
         while run_state.active(should_stop) {
             if !self.wait_for_next_poll(run_state, should_stop, next_config)? {
@@ -194,7 +183,7 @@ impl<N: Notifier> ControllerService<N> {
             }
 
             self.apply_pending_config(next_config)?;
-            self.poll_and_notify()?;
+            self.try_poll_and_notify("controller refresh failed");
         }
 
         Ok(())
@@ -234,9 +223,8 @@ impl<N: Notifier> ControllerService<N> {
     }
 
     fn refresh_pending_confirmations(&mut self) {
-        match self.input.poll_controllers() {
+        match self.snapshots.poll_controllers() {
             Ok(current) => {
-                let current = self.battery.enrich_controllers(current);
                 let events = self.monitor.observe_pending(current);
                 self.notify_events(events);
             }
@@ -247,64 +235,29 @@ impl<N: Notifier> ControllerService<N> {
         }
     }
 
-    fn poll_and_notify(&mut self) -> AppResult<HashSet<String>> {
-        let current = self.input.poll_controllers()?;
-        let current_ids = current
-            .iter()
-            .map(|controller| controller.id().to_string())
-            .collect();
-        self.observe_current(current);
-        Ok(current_ids)
-    }
-
-    fn observe_current(&mut self, current: Vec<Controller>) {
-        let current = self.battery.enrich_controllers(current);
+    fn poll_and_notify(&mut self) -> AppResult<()> {
+        let current = self.snapshots.poll_controllers()?;
         let events = self.monitor.observe_current(current);
         self.notify_events(events);
+        Ok(())
     }
 
-    fn pending_backend_event(&self, event: GameInputEvent) -> PendingBackendEvent {
-        let is_device_event = event.is_device_event();
-        let (controller, is_connected) = self.input.controller_from_event(event);
+    fn try_poll_and_notify(&mut self, error_context: &str) -> bool {
+        let confirmation_due = self
+            .monitor
+            .next_confirmation_delay()
+            .is_some_and(|delay| delay.is_zero());
 
-        PendingBackendEvent {
-            controller,
-            is_connected,
-            is_device_event,
-        }
-    }
-
-    fn process_backend_event(
-        &mut self,
-        event: PendingBackendEvent,
-        refresh_topology: bool,
-    ) -> bool {
-        let PendingBackendEvent {
-            controller,
-            is_connected,
-            is_device_event,
-        } = event;
-
-        if is_device_event && refresh_topology {
-            match self.input.poll_controllers() {
-                Ok(current)
-                    if !is_connected
-                        || current
-                            .iter()
-                            .any(|current| current.id() == controller.id()) =>
-                {
-                    self.observe_current(current);
-                    return true;
+        match self.poll_and_notify() {
+            Ok(()) => true,
+            Err(error) => {
+                eprintln!("{error_context}: {error}");
+                if confirmation_due {
+                    self.monitor.defer_due_confirmations();
                 }
-                Ok(_) => {}
-                Err(error) => eprintln!("controller topology refresh failed: {error}"),
+                false
             }
         }
-
-        let events = self.monitor.observe_incremental(controller, is_connected);
-
-        self.notify_events(events);
-        false
     }
 
     fn notify_events(&self, events: Vec<ControllerEvent>) {
@@ -338,38 +291,25 @@ fn next_event_wait(
     control_wait: Duration,
     regular_poll_wait: Duration,
     confirmation_wait: Option<Duration>,
+    follow_up_wait: Option<Duration>,
 ) -> Duration {
-    next_scheduled_wait(control_wait.min(regular_poll_wait), confirmation_wait)
+    let wait = next_scheduled_wait(control_wait.min(regular_poll_wait), confirmation_wait);
+    follow_up_wait.map_or(wait, |follow_up| wait.min(follow_up))
 }
 
-fn due_snapshot(
-    regular_snapshot_due: bool,
-    confirmation_snapshot_due: bool,
-) -> Option<DueSnapshot> {
-    if regular_snapshot_due {
-        Some(DueSnapshot::Regular)
-    } else if confirmation_snapshot_due {
-        Some(DueSnapshot::Confirmation)
+fn due_refresh(current_refresh_due: bool, confirmation_refresh_due: bool) -> Option<DueRefresh> {
+    if current_refresh_due {
+        Some(DueRefresh::Current)
+    } else if confirmation_refresh_due {
+        Some(DueRefresh::Confirmation)
     } else {
         None
-    }
-}
-
-fn post_snapshot_disposition(
-    event: &PendingBackendEvent,
-    current_ids: &HashSet<String>,
-) -> PostSnapshotDisposition {
-    if event.is_device_event && event.is_connected && !current_ids.contains(event.controller.id()) {
-        PostSnapshotDisposition::ConnectedMissingFallback
-    } else {
-        PostSnapshotDisposition::Drop
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashSet,
         sync::{
             Arc,
             atomic::{AtomicUsize, Ordering},
@@ -388,9 +328,8 @@ mod tests {
     };
 
     use super::{
-        ControllerService, ControllerServiceConfig, DueSnapshot, PendingBackendEvent,
-        PostSnapshotDisposition, due_snapshot, next_event_wait, next_scheduled_wait,
-        post_snapshot_disposition,
+        ControllerService, ControllerServiceConfig, DueRefresh, due_refresh, next_event_wait,
+        next_scheduled_wait,
     };
 
     #[derive(Clone)]
@@ -440,7 +379,12 @@ mod tests {
     #[test]
     fn event_wait_honors_regular_polls_and_confirmation_deadlines() {
         assert_eq!(
-            next_event_wait(Duration::from_millis(250), Duration::from_secs(60), None,),
+            next_event_wait(
+                Duration::from_millis(250),
+                Duration::from_secs(60),
+                None,
+                None,
+            ),
             Duration::from_millis(250)
         );
         assert_eq!(
@@ -448,6 +392,7 @@ mod tests {
                 Duration::from_millis(250),
                 Duration::from_millis(100),
                 Some(Duration::from_secs(6)),
+                None,
             ),
             Duration::from_millis(100)
         );
@@ -456,63 +401,30 @@ mod tests {
                 Duration::from_millis(250),
                 Duration::from_secs(60),
                 Some(Duration::from_millis(50)),
+                None,
             ),
             Duration::from_millis(50)
         );
-    }
-
-    #[test]
-    fn due_confirmation_snapshot_is_selected_at_the_event_boundary() {
-        assert_eq!(due_snapshot(false, true), Some(DueSnapshot::Confirmation));
-        assert_eq!(due_snapshot(false, false), None);
-    }
-
-    #[test]
-    fn one_regular_snapshot_services_simultaneous_deadlines() {
-        assert_eq!(due_snapshot(true, true), Some(DueSnapshot::Regular));
-        assert_eq!(due_snapshot(true, false), Some(DueSnapshot::Regular));
-    }
-
-    #[test]
-    fn successful_snapshot_drops_stale_disconnect_and_reading_events() {
-        let current_ids = HashSet::from(["one".to_string()]);
-        let disconnected = pending_event("one", true, false);
-        let reading = pending_event("one", false, true);
-
         assert_eq!(
-            post_snapshot_disposition(&disconnected, &current_ids),
-            PostSnapshotDisposition::Drop
-        );
-        assert_eq!(
-            post_snapshot_disposition(&reading, &current_ids),
-            PostSnapshotDisposition::Drop
-        );
-    }
-
-    #[test]
-    fn successful_snapshot_retains_only_a_connected_device_missing_from_topology() {
-        let current_ids = HashSet::from(["present".to_string()]);
-        let missing_connection = pending_event("missing", true, true);
-        let present_connection = pending_event("present", true, true);
-
-        assert_eq!(
-            post_snapshot_disposition(&missing_connection, &current_ids),
-            PostSnapshotDisposition::ConnectedMissingFallback
-        );
-        assert_eq!(
-            post_snapshot_disposition(&present_connection, &current_ids),
-            PostSnapshotDisposition::Drop
-        );
-    }
-
-    fn pending_event(id: &str, is_device_event: bool, is_connected: bool) -> PendingBackendEvent {
-        PendingBackendEvent {
-            controller: Controller::new(
-                id,
-                BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Unknown),
+            next_event_wait(
+                Duration::from_millis(250),
+                Duration::from_secs(60),
+                None,
+                Some(Duration::from_millis(25)),
             ),
-            is_connected,
-            is_device_event,
-        }
+            Duration::from_millis(25)
+        );
+    }
+
+    #[test]
+    fn due_confirmation_refresh_is_selected_at_the_event_boundary() {
+        assert_eq!(due_refresh(false, true), Some(DueRefresh::Confirmation));
+        assert_eq!(due_refresh(false, false), None);
+    }
+
+    #[test]
+    fn one_current_refresh_services_simultaneous_deadlines() {
+        assert_eq!(due_refresh(true, true), Some(DueRefresh::Current));
+        assert_eq!(due_refresh(true, false), Some(DueRefresh::Current));
     }
 }

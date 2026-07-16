@@ -65,7 +65,7 @@ unsafe fn enumerate_with_game_input(
 unsafe extern "system" fn enumeration_callback(
     _callback_token: u64,
     context: *mut c_void,
-    device: *mut IGameInputDevice,
+    _device: *mut IGameInputDevice,
     timestamp: u64,
     current_status: i32,
     previous_status: i32,
@@ -76,7 +76,6 @@ unsafe extern "system" fn enumeration_callback(
 
     let context = unsafe { &mut *(context as *mut EnumerationContext) };
     context.snapshots.push(snapshot_from_callback(
-        device,
         timestamp,
         current_status,
         previous_status,

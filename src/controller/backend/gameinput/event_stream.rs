@@ -3,15 +3,18 @@ use std::{
     time::Duration,
 };
 
-use super::raw::{CallbackWatcher, GameInputEvent};
+use super::raw::{CallbackWatcher, GameInputDeviceSnapshot};
 
 pub(crate) struct GameInputEventStream {
     _watcher: CallbackWatcher,
-    receiver: Receiver<GameInputEvent>,
+    receiver: Receiver<GameInputDeviceSnapshot>,
 }
 
 impl GameInputEventStream {
-    pub(super) fn new(watcher: CallbackWatcher, receiver: Receiver<GameInputEvent>) -> Self {
+    pub(super) fn new(
+        watcher: CallbackWatcher,
+        receiver: Receiver<GameInputDeviceSnapshot>,
+    ) -> Self {
         Self {
             _watcher: watcher,
             receiver,
@@ -21,7 +24,7 @@ impl GameInputEventStream {
     pub(crate) fn recv_timeout(
         &self,
         timeout: Duration,
-    ) -> Result<GameInputEvent, RecvTimeoutError> {
+    ) -> Result<GameInputDeviceSnapshot, RecvTimeoutError> {
         self.receiver.recv_timeout(timeout)
     }
 }

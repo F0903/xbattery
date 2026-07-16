@@ -3,7 +3,7 @@ use super::super::constants::{
 };
 use super::abi::IGameInput;
 
-/// Stops a callback and waits for any in-flight invocation to finish.
+/// Unregisters a callback and waits for any in-flight invocation to finish.
 ///
 /// # Safety
 ///
@@ -15,7 +15,6 @@ pub(super) unsafe fn unregister_callback(game_input: *mut IGameInput, token: u64
     }
 
     unsafe {
-        ((*(*game_input).vtbl).StopCallback)(game_input, token);
         ((*(*game_input).vtbl).UnregisterCallback)(
             game_input,
             token,

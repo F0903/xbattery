@@ -2,8 +2,6 @@ use std::ffi::c_void;
 
 use windows::core::{GUID, HRESULT};
 
-use super::super::GameInputBatteryState;
-
 #[repr(C)]
 pub(super) struct IGameInput {
     pub(super) vtbl: *const IGameInputVtbl,
@@ -11,16 +9,9 @@ pub(super) struct IGameInput {
 
 #[repr(C)]
 pub(super) struct IGameInputDevice {
-    pub(super) vtbl: *const IGameInputDeviceVtbl,
+    _private: [u8; 0],
 }
 
-#[repr(C)]
-pub(super) struct IGameInputReading {
-    pub(super) vtbl: *const IGameInputReadingVtbl,
-}
-
-pub(super) type GameInputReadingCallback =
-    Option<unsafe extern "system" fn(u64, *mut c_void, *mut IGameInputReading, bool)>;
 pub(super) type GameInputDeviceCallback =
     Option<unsafe extern "system" fn(u64, *mut c_void, *mut IGameInputDevice, u64, i32, i32)>;
 type GameInputGuideButtonCallback =
@@ -62,15 +53,8 @@ pub(super) struct IGameInputVtbl {
         *mut IGameInputDevice,
         *mut *mut c_void,
     ) -> HRESULT,
-    pub(super) RegisterReadingCallback: unsafe extern "system" fn(
-        *mut IGameInput,
-        *mut IGameInputDevice,
-        i32,
-        f32,
-        *mut c_void,
-        GameInputReadingCallback,
-        *mut u64,
-    ) -> HRESULT,
+    // Retain the unused v0 slot so the methods below keep their documented ABI offsets.
+    pub(super) _RegisterReadingCallback: unsafe extern "system" fn(),
     pub(super) RegisterDeviceCallback: unsafe extern "system" fn(
         *mut IGameInput,
         *mut IGameInputDevice,
@@ -95,34 +79,9 @@ pub(super) struct IGameInputVtbl {
         GameInputKeyboardLayoutCallback,
         *mut u64,
     ) -> HRESULT,
-    pub(super) StopCallback: unsafe extern "system" fn(*mut IGameInput, u64),
+    // Retain the unused v0 slot immediately before UnregisterCallback.
+    pub(super) _StopCallback: unsafe extern "system" fn(),
     pub(super) UnregisterCallback: unsafe extern "system" fn(*mut IGameInput, u64, u64) -> bool,
-}
-
-#[repr(C)]
-#[allow(non_snake_case)]
-pub(super) struct IGameInputDeviceVtbl {
-    pub(super) QueryInterface:
-        unsafe extern "system" fn(*mut IGameInputDevice, *const GUID, *mut *mut c_void) -> HRESULT,
-    pub(super) AddRef: unsafe extern "system" fn(*mut IGameInputDevice) -> u32,
-    pub(super) Release: unsafe extern "system" fn(*mut IGameInputDevice) -> u32,
-    pub(super) GetDeviceInfo: unsafe extern "system" fn(*mut IGameInputDevice) -> *const c_void,
-    pub(super) GetDeviceStatus: unsafe extern "system" fn(*mut IGameInputDevice) -> i32,
-    pub(super) GetBatteryState:
-        unsafe extern "system" fn(*mut IGameInputDevice, *mut GameInputBatteryState),
-}
-
-#[repr(C)]
-#[allow(non_snake_case)]
-pub(super) struct IGameInputReadingVtbl {
-    pub(super) QueryInterface:
-        unsafe extern "system" fn(*mut IGameInputReading, *const GUID, *mut *mut c_void) -> HRESULT,
-    pub(super) AddRef: unsafe extern "system" fn(*mut IGameInputReading) -> u32,
-    pub(super) Release: unsafe extern "system" fn(*mut IGameInputReading) -> u32,
-    pub(super) GetInputKind: unsafe extern "system" fn(*mut IGameInputReading) -> i32,
-    pub(super) GetTimestamp: unsafe extern "system" fn(*mut IGameInputReading) -> u64,
-    pub(super) GetDevice:
-        unsafe extern "system" fn(*mut IGameInputReading, *mut *mut IGameInputDevice),
 }
 
 unsafe extern "system" {
