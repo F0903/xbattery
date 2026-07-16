@@ -54,7 +54,7 @@ pub(super) fn install(show_dialog: bool, force: bool) -> AppResult<()> {
         return Ok(());
     }
 
-    let report = installer.install(true, overwrite)?;
+    let report = installer.install(overwrite)?;
     println!("{}", report.summary());
 
     if show_dialog {
@@ -64,13 +64,9 @@ pub(super) fn install(show_dialog: bool, force: bool) -> AppResult<()> {
     Ok(())
 }
 
-pub(super) fn uninstall(show_dialog: bool) -> AppResult<()> {
+pub(super) fn uninstall() -> AppResult<()> {
     let report = StartupInstaller::new()?.uninstall()?;
     println!("{}", report.summary());
-
-    if show_dialog {
-        dialog::show_info("xbattery", &report.summary());
-    }
 
     Ok(())
 }

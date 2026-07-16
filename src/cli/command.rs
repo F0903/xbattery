@@ -43,7 +43,7 @@ pub(super) enum Command {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Use GameInput events first, with polling fallback.
+    /// Monitor XInput snapshots, using GameInput events to wake promptly.
     #[command(disable_help_flag = true)]
     Monitor,
     /// Print XInput and Windows.Gaming.Input battery reports once.

@@ -5,15 +5,12 @@ use std::{
 
 use crate::{
     AppResult,
-    controller::backend::{GameInputBackend, WinRTBackend, XInputBackend},
+    controller::backend::{gameinput, win_rt, xinput},
 };
 
 pub(super) fn probe() -> AppResult<()> {
-    let xinput = XInputBackend;
-    let win_rt = WinRTBackend;
-
     println!("XInput controllers:");
-    for report in xinput.diagnostic_reports()? {
+    for report in xinput::diagnostic_reports()? {
         match (report.packet_number, report.battery) {
             (Some(packet_number), Some(battery)) => println!(
                 "  slot {}: connected, packet {}, battery {}",
@@ -27,7 +24,7 @@ pub(super) fn probe() -> AppResult<()> {
 
     println!();
     println!("Windows.Gaming.Input gamepads:");
-    let gamepad_reports = win_rt.gamepad_reports()?;
+    let gamepad_reports = win_rt::gamepad_reports()?;
     if gamepad_reports.is_empty() {
         println!("  none");
     }
@@ -42,7 +39,7 @@ pub(super) fn probe() -> AppResult<()> {
 
     println!();
     println!("Windows.Gaming.Input raw controllers:");
-    let raw_reports = win_rt.raw_controller_reports()?;
+    let raw_reports = win_rt::raw_controller_reports()?;
     if raw_reports.is_empty() {
         println!("  none");
     }
@@ -59,10 +56,8 @@ pub(super) fn probe() -> AppResult<()> {
 }
 
 pub(super) fn gameinput_probe() -> AppResult<()> {
-    let gameinput = GameInputBackend;
-
     println!("GameInput RegisterDeviceCallback blocking enumeration:");
-    let events = gameinput.diagnostic_snapshots()?;
+    let events = gameinput::diagnostic_snapshots()?;
 
     if events.is_empty() {
         println!("  no gamepad callbacks");
@@ -82,10 +77,8 @@ pub(super) fn gameinput_probe() -> AppResult<()> {
 }
 
 pub(super) fn gameinput_watch() -> AppResult<()> {
-    let gameinput = GameInputBackend;
-
     println!("GameInput persistent callback watcher:");
-    let stream = gameinput.start_diagnostic_event_stream()?;
+    let stream = gameinput::start_diagnostic_event_stream()?;
     let deadline = Instant::now() + Duration::from_secs(10);
     let mut count = 0;
 

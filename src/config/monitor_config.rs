@@ -4,17 +4,17 @@ use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct MonitorConfig {
-    pub poll_interval_seconds: u64,
-    pub control_wait_slice_millis: u64,
+pub(crate) struct MonitorConfig {
+    pub(crate) poll_interval_seconds: u64,
+    pub(crate) control_wait_slice_millis: u64,
 }
 
 impl MonitorConfig {
-    pub fn poll_interval(&self) -> Duration {
+    pub(crate) fn poll_interval(&self) -> Duration {
         Duration::from_secs(self.poll_interval_seconds)
     }
 
-    pub fn control_wait_slice(&self) -> Duration {
+    pub(crate) fn control_wait_slice(&self) -> Duration {
         Duration::from_millis(self.control_wait_slice_millis)
     }
 }

@@ -1,4 +1,6 @@
-use std::{env, fs, path::Path, process::Command, time::Duration};
+use std::{
+    env, fs, os::windows::process::CommandExt, path::Path, process::Command, time::Duration,
+};
 
 use super::{
     InstallReport, StartupStatus, UninstallReport, paths::StartupPaths, process::ProcessHandle,
@@ -11,6 +13,7 @@ use crate::{
 
 const DEFAULT_CONFIG: &str = include_str!("../../xbattery.toml");
 const EXISTING_MONITOR_STOP_TIMEOUT: Duration = Duration::from_secs(10);
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[derive(Clone, Debug)]
 pub struct StartupInstaller {
@@ -26,7 +29,7 @@ impl StartupInstaller {
         })
     }
 
-    pub fn install(&self, start_now: bool, overwrite: bool) -> AppResult<InstallReport> {
+    pub fn install(&self, overwrite: bool) -> AppResult<InstallReport> {
         let status = self.status();
         if status.has_install_state() && !overwrite {
             return Err(format!(
@@ -44,18 +47,11 @@ impl StartupInstaller {
         self.copy_exe()?;
         self.ensure_config()?;
         self.task.create(&self.paths.installed_exe)?;
-
-        let started_monitor = if start_now {
-            self.start_monitor()?;
-            true
-        } else {
-            false
-        };
+        self.start_monitor()?;
 
         Ok(InstallReport {
             installed_exe: self.paths.installed_exe.clone(),
             installed_config: self.paths.installed_config.clone(),
-            started_monitor,
         })
     }
 
@@ -84,13 +80,7 @@ impl StartupInstaller {
     pub fn start_monitor(&self) -> AppResult<()> {
         let mut command = Command::new(&self.paths.installed_exe);
         command.arg("monitor");
-
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            command.creation_flags(CREATE_NO_WINDOW);
-        }
+        command.creation_flags(CREATE_NO_WINDOW);
 
         command.spawn()?;
         Ok(())

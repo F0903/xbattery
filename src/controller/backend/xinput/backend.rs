@@ -5,37 +5,32 @@ use super::XInputDiagnosticReport;
 use super::native;
 use super::snapshot::ControllerSnapshot;
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct XInputBackend;
+#[cfg(debug_assertions)]
+pub(crate) fn diagnostic_reports() -> AppResult<Vec<XInputDiagnosticReport>> {
+    Ok(native::poll_controllers()?
+        .into_iter()
+        .enumerate()
+        .map(|(slot, snapshot)| match snapshot {
+            Some(snapshot) => XInputDiagnosticReport {
+                slot: snapshot.slot,
+                packet_number: Some(snapshot.packet_number),
+                battery: Some(snapshot.battery),
+            },
+            None => XInputDiagnosticReport {
+                slot: slot as u32,
+                packet_number: None,
+                battery: None,
+            },
+        })
+        .collect())
+}
 
-impl XInputBackend {
-    #[cfg(debug_assertions)]
-    pub fn diagnostic_reports(&self) -> AppResult<Vec<XInputDiagnosticReport>> {
-        Ok(native::poll_controllers()?
-            .into_iter()
-            .enumerate()
-            .map(|(slot, snapshot)| match snapshot {
-                Some(snapshot) => XInputDiagnosticReport {
-                    slot: snapshot.slot,
-                    packet_number: Some(snapshot.packet_number),
-                    battery: Some(snapshot.battery),
-                },
-                None => XInputDiagnosticReport {
-                    slot: slot as u32,
-                    packet_number: None,
-                    battery: None,
-                },
-            })
-            .collect())
-    }
-
-    pub(crate) fn poll_controllers(&self) -> AppResult<Vec<Controller>> {
-        Ok(native::poll_controllers()?
-            .into_iter()
-            .flatten()
-            .map(controller_from_snapshot)
-            .collect())
-    }
+pub(crate) fn poll_controllers() -> AppResult<Vec<Controller>> {
+    Ok(native::poll_controllers()?
+        .into_iter()
+        .flatten()
+        .map(controller_from_snapshot)
+        .collect())
 }
 
 fn controller_from_snapshot(snapshot: ControllerSnapshot) -> Controller {

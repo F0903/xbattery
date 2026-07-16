@@ -1,10 +1,11 @@
-mod gameinput;
+mod controller_backend;
+pub(crate) mod gameinput;
 #[cfg(debug_assertions)]
-mod win_rt;
-mod xinput;
+pub(crate) mod win_rt;
+mod windows;
+pub(crate) mod xinput;
 
-pub use gameinput::GameInputBackend;
-pub(crate) use gameinput::GameInputEventStream;
-#[cfg(debug_assertions)]
-pub use win_rt::WinRTBackend;
-pub use xinput::XInputBackend;
+pub(crate) use controller_backend::{
+    ControllerBackend, ControllerEventStream, ControllerStreamStatus,
+};
+pub(crate) use windows::WindowsControllerBackend;

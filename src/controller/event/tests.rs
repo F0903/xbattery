@@ -57,6 +57,126 @@ fn connected_notifications_can_be_disabled() {
 }
 
 #[test]
+fn ordinary_battery_status_notifications_use_the_accepted_reading() {
+    let readings = [
+        (
+            BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Precise(50)),
+            "Battery level is 50%",
+        ),
+        (
+            BatteryReading::new(
+                BatteryKind::Unknown,
+                BatteryCharge::Coarse(BatteryLevel::Medium),
+            ),
+            "Battery level is ~70%",
+        ),
+        (
+            BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown),
+            "Battery level is wired",
+        ),
+    ];
+
+    for (reading, expected_body) in readings {
+        let event = ControllerEvent::BatteryStatus {
+            controller: controller_with_reading(reading),
+            warning: None,
+        };
+        let notification = event
+            .notification(&ControllerNotificationPolicy::default())
+            .unwrap();
+
+        assert_eq!(notification.title(), "Xbox Controller Battery Status");
+        assert_eq!(notification.body(), expected_body);
+        assert_eq!(notification.urgency(), NotificationUrgency::Normal);
+    }
+}
+
+#[test]
+fn battery_status_warning_overrides_connected_gating_and_exposes_audio() {
+    let warning = BatteryWarning::precise(
+        10,
+        BatteryWarningLevel::new(
+            "critical",
+            Some(10),
+            None,
+            true,
+            true,
+            Some(AudioClip::file("critical.wav")),
+        ),
+    );
+    let event = ControllerEvent::BatteryStatus {
+        controller: controller(BatteryCharge::Precise(10)),
+        warning: Some(warning),
+    };
+    let notification = event
+        .notification(&ControllerNotificationPolicy::new(false, true))
+        .unwrap();
+
+    assert_eq!(notification.urgency(), NotificationUrgency::Urgent);
+    assert_eq!(event.audio(), Some(&AudioClip::file("critical.wav")));
+}
+
+#[test]
+fn battery_status_uses_the_actual_precise_value_instead_of_the_warning_threshold() {
+    let event = ControllerEvent::BatteryStatus {
+        controller: controller(BatteryCharge::Precise(23)),
+        warning: Some(BatteryWarning::precise(
+            25,
+            BatteryWarningLevel::new("low", Some(25), None, true, false, None),
+        )),
+    };
+    let notification = event
+        .notification(&ControllerNotificationPolicy::default())
+        .unwrap();
+
+    assert_eq!(notification.body(), "Battery level is 23%");
+    assert!(!notification.body().contains("25%"));
+}
+
+#[test]
+fn ordinary_battery_status_honors_connected_notification_gating() {
+    let event = ControllerEvent::BatteryStatus {
+        controller: controller(BatteryCharge::Precise(50)),
+        warning: None,
+    };
+
+    assert_eq!(
+        event.notification(&ControllerNotificationPolicy::new(false, true)),
+        None
+    );
+}
+
+#[test]
+fn notification_disabled_warning_uses_ordinary_status_semantics() {
+    let warning = BatteryWarning::precise(
+        25,
+        BatteryWarningLevel::new(
+            "low",
+            Some(25),
+            None,
+            false,
+            true,
+            Some(AudioClip::file("low.wav")),
+        ),
+    );
+    let event = ControllerEvent::BatteryStatus {
+        controller: controller(BatteryCharge::Precise(23)),
+        warning: Some(warning),
+    };
+    let notification = event
+        .notification(&ControllerNotificationPolicy::new(true, true))
+        .unwrap();
+
+    assert_eq!(notification.urgency(), NotificationUrgency::Normal);
+    assert_eq!(notification.body(), "Battery level is 23%");
+    assert_eq!(event.audio(), Some(&AudioClip::file("low.wav")));
+    assert_eq!(
+        event.notification(&ControllerNotificationPolicy::new(false, true)),
+        None
+    );
+}
+
+#[test]
 fn disconnected_notifications_can_be_disabled() {
     let event =
         ControllerEvent::Disconnected(controller(BatteryCharge::Coarse(BatteryLevel::Full)));
@@ -217,10 +337,11 @@ fn coarse_empty_battery_notifications_are_urgent() {
 }
 
 fn controller(charge: BatteryCharge) -> Controller {
-    Controller::new(
-        "controller",
-        BatteryReading::new(BatteryKind::Unknown, charge),
-    )
+    controller_with_reading(BatteryReading::new(BatteryKind::Unknown, charge))
+}
+
+fn controller_with_reading(reading: BatteryReading) -> Controller {
+    Controller::new("controller", reading)
 }
 
 fn precise_warning(percent: u8, urgent: bool) -> BatteryWarning {

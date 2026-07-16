@@ -2,10 +2,10 @@ use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct NotificationsConfig {
-    pub app_id: String,
-    pub notify_connected: bool,
-    pub notify_disconnected: bool,
+pub(crate) struct NotificationsConfig {
+    pub(crate) app_id: String,
+    pub(crate) notify_connected: bool,
+    pub(crate) notify_disconnected: bool,
 }
 
 impl Default for NotificationsConfig {

@@ -4,6 +4,8 @@ mod diagnostic_report;
 mod native;
 mod snapshot;
 
-pub use backend::XInputBackend;
 #[cfg(debug_assertions)]
-pub use diagnostic_report::XInputDiagnosticReport;
+pub(crate) use backend::diagnostic_reports;
+pub(crate) use backend::poll_controllers;
+#[cfg(debug_assertions)]
+pub(crate) use diagnostic_report::XInputDiagnosticReport;

@@ -28,10 +28,6 @@ impl BatteryWarning {
     pub fn level(&self) -> &BatteryWarningLevel {
         &self.level
     }
-
-    pub fn urgent(&self) -> bool {
-        self.level.urgent()
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

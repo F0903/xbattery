@@ -15,7 +15,7 @@ use crate::{
     startup::StartupInstaller,
 };
 
-use super::{CheckUpdateReport, UpdateReport};
+use super::report::{CheckUpdateReport, UpdateReport};
 
 const BIN_NAME: &str = "xbattery";
 const MONITOR_STOP_TIMEOUT: Duration = Duration::from_secs(10);

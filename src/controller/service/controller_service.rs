@@ -1,5 +1,4 @@
 use std::{
-    sync::mpsc::RecvTimeoutError,
     thread,
     time::{Duration, Instant},
 };
@@ -8,7 +7,9 @@ use crate::{AppResult, audio, notifier::Notifier};
 
 use super::{ControllerServiceConfig, run_state::RunState};
 use crate::controller::{
-    backend::{GameInputBackend, GameInputEventStream, XInputBackend},
+    backend::{
+        ControllerBackend, ControllerEventStream, ControllerStreamStatus, WindowsControllerBackend,
+    },
     event::ControllerEvent,
     monitor::ControllerMonitor,
 };
@@ -16,10 +17,9 @@ use crate::controller::{
 const TOPOLOGY_SETTLE_DELAY: Duration = Duration::from_millis(250);
 const TOPOLOGY_SETTLE_ATTEMPTS: u8 = 3;
 
-pub struct ControllerService<N: Notifier> {
+pub struct ControllerService<N: Notifier, B: ControllerBackend = WindowsControllerBackend> {
     pub(super) monitor: ControllerMonitor,
-    pub(super) events: GameInputBackend,
-    pub(super) snapshots: XInputBackend,
+    pub(super) backend: B,
     pub(super) notifier: N,
     pub(super) config: ControllerServiceConfig,
 }
@@ -32,15 +32,20 @@ enum EventLoopExit {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum DueRefresh {
     Current,
-    Confirmation,
+    Pending,
 }
 
 impl<N: Notifier> ControllerService<N> {
     pub fn new(notifier: N, config: ControllerServiceConfig) -> Self {
+        Self::with_backend(notifier, config, WindowsControllerBackend)
+    }
+}
+
+impl<N: Notifier, B: ControllerBackend> ControllerService<N, B> {
+    pub(crate) fn with_backend(notifier: N, config: ControllerServiceConfig, backend: B) -> Self {
         Self {
             monitor: ControllerMonitor::new(config.warning_policy().clone()),
-            events: GameInputBackend,
-            snapshots: XInputBackend,
+            backend,
             notifier,
             config,
         }
@@ -53,7 +58,7 @@ impl<N: Notifier> ControllerService<N> {
     ) -> AppResult<()> {
         let run_state = RunState::new()?;
 
-        match self.events.start_event_stream() {
+        match self.backend.start_event_stream() {
             Ok(stream) => match self.run_backend_event_loop(
                 &run_state,
                 &should_stop,
@@ -61,13 +66,13 @@ impl<N: Notifier> ControllerService<N> {
                 &mut next_config,
             )? {
                 EventLoopExit::StreamDisconnected if run_state.active(&should_stop) => {
-                    eprintln!("GameInput event stream disconnected; falling back to polling");
+                    eprintln!("controller event stream disconnected; falling back to polling");
                     self.run_polling_loop(&run_state, &should_stop, &mut next_config)?;
                 }
                 EventLoopExit::StopRequested | EventLoopExit::StreamDisconnected => {}
             },
             Err(error) => {
-                eprintln!("GameInput event stream unavailable ({error}); falling back to polling");
+                eprintln!("controller event stream unavailable ({error}); falling back to polling");
                 self.run_polling_loop(&run_state, &should_stop, &mut next_config)?
             }
         }
@@ -96,7 +101,7 @@ impl<N: Notifier> ControllerService<N> {
         &mut self,
         run_state: &RunState,
         should_stop: &impl Fn() -> bool,
-        stream: GameInputEventStream,
+        stream: B::EventStream,
         next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
     ) -> AppResult<EventLoopExit> {
         let initial_refresh_failed = !self.try_poll_and_notify("initial controller refresh failed");
@@ -120,14 +125,14 @@ impl<N: Notifier> ControllerService<N> {
             let wait_timeout = next_event_wait(
                 self.config.control_wait_slice(),
                 regular_poll_delay,
-                self.monitor.next_confirmation_delay(),
+                self.monitor.next_refresh_delay(),
                 follow_up_refresh_delay,
             );
 
-            let topology_changed = match stream.recv_timeout(wait_timeout) {
-                Ok(_) => true,
-                Err(RecvTimeoutError::Timeout) => false,
-                Err(RecvTimeoutError::Disconnected) => {
+            let topology_changed = match stream.wait_for_change(wait_timeout) {
+                ControllerStreamStatus::Changed => true,
+                ControllerStreamStatus::TimedOut => false,
+                ControllerStreamStatus::Disconnected => {
                     return Ok(EventLoopExit::StreamDisconnected);
                 }
             };
@@ -139,13 +144,13 @@ impl<N: Notifier> ControllerService<N> {
             let regular_refresh_due = last_refresh.elapsed() >= self.config.poll_interval();
             let follow_up_refresh_due =
                 follow_up_refresh_at.is_some_and(|deadline| Instant::now() >= deadline);
-            let confirmation_refresh_due = self
+            let pending_refresh_due = self
                 .monitor
-                .next_confirmation_delay()
+                .next_refresh_delay()
                 .is_some_and(|delay| delay.is_zero());
             match due_refresh(
                 topology_changed || regular_refresh_due || follow_up_refresh_due,
-                confirmation_refresh_due,
+                pending_refresh_due,
             ) {
                 Some(DueRefresh::Current) => {
                     let refresh_succeeded = self.try_poll_and_notify("controller refresh failed");
@@ -160,7 +165,7 @@ impl<N: Notifier> ControllerService<N> {
                     }
                     last_refresh = Instant::now();
                 }
-                Some(DueRefresh::Confirmation) => self.refresh_pending_confirmations(),
+                Some(DueRefresh::Pending) => self.refresh_pending_readings(),
                 None => {}
             }
         }
@@ -176,14 +181,17 @@ impl<N: Notifier> ControllerService<N> {
     ) -> AppResult<()> {
         self.apply_pending_config(next_config)?;
         self.try_poll_and_notify("initial controller refresh failed");
+        let mut last_refresh = Instant::now();
 
         while run_state.active(should_stop) {
-            if !self.wait_for_next_poll(run_state, should_stop, next_config)? {
-                break;
+            match self.wait_for_next_poll(run_state, should_stop, last_refresh, next_config)? {
+                Some(DueRefresh::Current) => {
+                    self.try_poll_and_notify("controller refresh failed");
+                    last_refresh = Instant::now();
+                }
+                Some(DueRefresh::Pending) => self.refresh_pending_readings(),
+                None => break,
             }
-
-            self.apply_pending_config(next_config)?;
-            self.try_poll_and_notify("controller refresh failed");
         }
 
         Ok(())
@@ -193,67 +201,68 @@ impl<N: Notifier> ControllerService<N> {
         &mut self,
         run_state: &RunState,
         should_stop: &impl Fn() -> bool,
+        last_refresh: Instant,
         next_config: &mut impl FnMut() -> AppResult<Option<ControllerServiceConfig>>,
-    ) -> AppResult<bool> {
-        let mut elapsed = Duration::ZERO;
-
+    ) -> AppResult<Option<DueRefresh>> {
         loop {
             self.apply_pending_config(next_config)?;
 
             if !run_state.active(should_stop) {
-                return Ok(false);
+                return Ok(None);
             }
 
-            let remaining = next_scheduled_wait(
-                self.config.poll_interval().saturating_sub(elapsed),
-                self.monitor.next_confirmation_delay(),
-            );
+            let regular_wait = self
+                .config
+                .poll_interval()
+                .saturating_sub(last_refresh.elapsed());
+            let pending_wait = self.monitor.next_refresh_delay();
+            let remaining = next_scheduled_wait(regular_wait, pending_wait);
             if remaining.is_zero() {
-                break;
+                return Ok(due_refresh(
+                    regular_wait.is_zero(),
+                    pending_wait.is_some_and(|delay| delay.is_zero()),
+                ));
             }
 
             let sleep_for = remaining.min(self.config.control_wait_slice());
             thread::sleep(sleep_for);
-            elapsed += sleep_for;
         }
-
-        self.apply_pending_config(next_config)?;
-
-        Ok(run_state.active(should_stop))
     }
 
-    fn refresh_pending_confirmations(&mut self) {
-        match self.snapshots.poll_controllers() {
+    fn refresh_pending_readings(&mut self) {
+        match self.backend.poll_controllers() {
             Ok(current) => {
                 let events = self.monitor.observe_pending(current);
                 self.notify_events(events);
             }
             Err(error) => {
-                eprintln!("battery confirmation refresh failed: {error}");
-                self.monitor.defer_due_confirmations();
+                eprintln!("pending battery refresh failed: {error}");
+                let events = self.monitor.defer_due_refreshes();
+                self.notify_events(events);
             }
         }
     }
 
     fn poll_and_notify(&mut self) -> AppResult<()> {
-        let current = self.snapshots.poll_controllers()?;
+        let current = self.backend.poll_controllers()?;
         let events = self.monitor.observe_current(current);
         self.notify_events(events);
         Ok(())
     }
 
     fn try_poll_and_notify(&mut self, error_context: &str) -> bool {
-        let confirmation_due = self
+        let pending_refresh_due = self
             .monitor
-            .next_confirmation_delay()
+            .next_refresh_delay()
             .is_some_and(|delay| delay.is_zero());
 
         match self.poll_and_notify() {
             Ok(()) => true,
             Err(error) => {
                 eprintln!("{error_context}: {error}");
-                if confirmation_due {
-                    self.monitor.defer_due_confirmations();
+                if pending_refresh_due {
+                    let events = self.monitor.defer_due_refreshes();
+                    self.notify_events(events);
                 }
                 false
             }
@@ -283,25 +292,25 @@ impl<N: Notifier> ControllerService<N> {
     }
 }
 
-fn next_scheduled_wait(regular_wait: Duration, confirmation_wait: Option<Duration>) -> Duration {
-    confirmation_wait.map_or(regular_wait, |confirmation| regular_wait.min(confirmation))
+fn next_scheduled_wait(regular_wait: Duration, pending_wait: Option<Duration>) -> Duration {
+    pending_wait.map_or(regular_wait, |pending| regular_wait.min(pending))
 }
 
 fn next_event_wait(
     control_wait: Duration,
     regular_poll_wait: Duration,
-    confirmation_wait: Option<Duration>,
+    pending_wait: Option<Duration>,
     follow_up_wait: Option<Duration>,
 ) -> Duration {
-    let wait = next_scheduled_wait(control_wait.min(regular_poll_wait), confirmation_wait);
+    let wait = next_scheduled_wait(control_wait.min(regular_poll_wait), pending_wait);
     follow_up_wait.map_or(wait, |follow_up| wait.min(follow_up))
 }
 
-fn due_refresh(current_refresh_due: bool, confirmation_refresh_due: bool) -> Option<DueRefresh> {
+fn due_refresh(current_refresh_due: bool, pending_refresh_due: bool) -> Option<DueRefresh> {
     if current_refresh_due {
         Some(DueRefresh::Current)
-    } else if confirmation_refresh_due {
-        Some(DueRefresh::Confirmation)
+    } else if pending_refresh_due {
+        Some(DueRefresh::Pending)
     } else {
         None
     }
@@ -310,6 +319,9 @@ fn due_refresh(current_refresh_due: bool, confirmation_refresh_due: bool) -> Opt
 #[cfg(test)]
 mod tests {
     use std::{
+        cell::RefCell,
+        collections::VecDeque,
+        rc::Rc,
         sync::{
             Arc,
             atomic::{AtomicUsize, Ordering},
@@ -321,6 +333,7 @@ mod tests {
         AppResult,
         controller::{
             Controller,
+            backend::{ControllerBackend, ControllerEventStream, ControllerStreamStatus},
             battery::{BatteryCharge, BatteryKind, BatteryLevel, BatteryReading},
             event::ControllerEvent,
         },
@@ -344,6 +357,105 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Default)]
+    struct RecordingNotifier {
+        notifications: Rc<RefCell<Vec<Notification>>>,
+    }
+
+    impl Notifier for RecordingNotifier {
+        fn notify(&self, notification: &Notification) -> AppResult<()> {
+            self.notifications.borrow_mut().push(notification.clone());
+            Ok(())
+        }
+    }
+
+    struct TestBackend;
+    struct TestEventStream;
+
+    struct SequenceBackend {
+        polls: RefCell<VecDeque<Vec<Controller>>>,
+    }
+
+    impl SequenceBackend {
+        fn new(polls: impl IntoIterator<Item = Vec<Controller>>) -> Self {
+            Self {
+                polls: RefCell::new(polls.into_iter().collect()),
+            }
+        }
+    }
+
+    impl ControllerBackend for TestBackend {
+        type EventStream = TestEventStream;
+
+        fn start_event_stream(&self) -> AppResult<Self::EventStream> {
+            Ok(TestEventStream)
+        }
+
+        fn poll_controllers(&self) -> AppResult<Vec<Controller>> {
+            Ok(vec![full_controller()])
+        }
+    }
+
+    impl ControllerBackend for SequenceBackend {
+        type EventStream = TestEventStream;
+
+        fn start_event_stream(&self) -> AppResult<Self::EventStream> {
+            Ok(TestEventStream)
+        }
+
+        fn poll_controllers(&self) -> AppResult<Vec<Controller>> {
+            Ok(self
+                .polls
+                .borrow_mut()
+                .pop_front()
+                .expect("a scripted controller poll"))
+        }
+    }
+
+    impl ControllerEventStream for TestEventStream {
+        fn wait_for_change(&self, _timeout: Duration) -> ControllerStreamStatus {
+            ControllerStreamStatus::TimedOut
+        }
+    }
+
+    #[test]
+    fn service_polls_through_the_backend_contract() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let notifier = FailingNotifier {
+            attempts: Arc::clone(&attempts),
+        };
+        let mut service = ControllerService::with_backend(
+            notifier,
+            ControllerServiceConfig::default(),
+            TestBackend,
+        );
+
+        assert!(service.try_poll_and_notify("test controller refresh failed"));
+        assert_eq!(attempts.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn unknown_connection_is_followed_by_one_settled_battery_notification() {
+        let notifier = RecordingNotifier::default();
+        let notifications = Rc::clone(&notifier.notifications);
+        let full = full_controller();
+        let backend =
+            SequenceBackend::new([vec![unknown_controller()], vec![full.clone()], vec![full]]);
+        let mut service =
+            ControllerService::with_backend(notifier, ControllerServiceConfig::default(), backend);
+
+        assert!(service.try_poll_and_notify("initial controller refresh failed"));
+        service.refresh_pending_readings();
+        service.refresh_pending_readings();
+
+        let notifications = notifications.borrow();
+        assert_eq!(notifications.len(), 2);
+        assert_eq!(notifications[0].title(), "Xbox Controller Connected");
+        assert_eq!(notifications[0].body(), "Controller is connected");
+        assert_eq!(notifications[1].title(), "Xbox Controller Battery Status");
+        assert_eq!(notifications[1].body(), "Battery level is ~100%");
+    }
+
     #[test]
     fn notification_failures_do_not_abort_event_processing() {
         let attempts = Arc::new(AtomicUsize::new(0));
@@ -351,21 +463,18 @@ mod tests {
             attempts: Arc::clone(&attempts),
         };
         let service = ControllerService::new(notifier, ControllerServiceConfig::default());
-        let controller = Controller::new(
-            "one",
-            BatteryReading::new(
-                BatteryKind::Alkaline,
-                BatteryCharge::Coarse(BatteryLevel::Full),
-            ),
-        );
 
-        service.notify_events(vec![ControllerEvent::Connected(controller)]);
+        service.notify_events(vec![ControllerEvent::Connected(full_controller())]);
 
         assert_eq!(attempts.load(Ordering::Relaxed), 1);
     }
 
     #[test]
-    fn confirmation_deadline_preempts_the_regular_poll_interval() {
+    fn pending_battery_deadline_preempts_the_regular_poll_interval() {
+        assert_eq!(
+            next_scheduled_wait(Duration::from_secs(60), Some(Duration::from_millis(250)),),
+            Duration::from_millis(250)
+        );
         assert_eq!(
             next_scheduled_wait(Duration::from_secs(60), Some(Duration::from_secs(6))),
             Duration::from_secs(6)
@@ -377,7 +486,7 @@ mod tests {
     }
 
     #[test]
-    fn event_wait_honors_regular_polls_and_confirmation_deadlines() {
+    fn event_wait_honors_regular_polls_and_pending_battery_deadlines() {
         assert_eq!(
             next_event_wait(
                 Duration::from_millis(250),
@@ -395,6 +504,15 @@ mod tests {
                 None,
             ),
             Duration::from_millis(100)
+        );
+        assert_eq!(
+            next_event_wait(
+                Duration::from_secs(1),
+                Duration::from_secs(60),
+                Some(Duration::from_millis(250)),
+                None,
+            ),
+            Duration::from_millis(250)
         );
         assert_eq!(
             next_event_wait(
@@ -417,8 +535,8 @@ mod tests {
     }
 
     #[test]
-    fn due_confirmation_refresh_is_selected_at_the_event_boundary() {
-        assert_eq!(due_refresh(false, true), Some(DueRefresh::Confirmation));
+    fn due_pending_refresh_is_selected_at_the_event_boundary() {
+        assert_eq!(due_refresh(false, true), Some(DueRefresh::Pending));
         assert_eq!(due_refresh(false, false), None);
     }
 
@@ -426,5 +544,22 @@ mod tests {
     fn one_current_refresh_services_simultaneous_deadlines() {
         assert_eq!(due_refresh(true, true), Some(DueRefresh::Current));
         assert_eq!(due_refresh(true, false), Some(DueRefresh::Current));
+    }
+
+    fn full_controller() -> Controller {
+        Controller::new(
+            "one",
+            BatteryReading::new(
+                BatteryKind::Alkaline,
+                BatteryCharge::Coarse(BatteryLevel::Full),
+            ),
+        )
+    }
+
+    fn unknown_controller() -> Controller {
+        Controller::new(
+            "one",
+            BatteryReading::new(BatteryKind::Unknown, BatteryCharge::Unknown),
+        )
     }
 }

@@ -1,7 +1,7 @@
 use std::{fmt, path::PathBuf};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ConfigIssue {
+pub(crate) struct ConfigIssue {
     path: PathBuf,
     message: String,
 }
@@ -14,11 +14,11 @@ impl ConfigIssue {
         }
     }
 
-    pub fn path(&self) -> &std::path::Path {
+    pub(crate) fn path(&self) -> &std::path::Path {
         &self.path
     }
 
-    pub fn message(&self) -> &str {
+    pub(crate) fn message(&self) -> &str {
         &self.message
     }
 }

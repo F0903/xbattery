@@ -30,7 +30,7 @@ pub(super) fn run(
         Some(Command::Help { command }) => print_help(command.as_deref()),
         Some(Command::Install { force }) => install::install(false, force),
         Some(Command::InstallElevated) => install::install_elevated_retry(),
-        Some(Command::Uninstall) => install::uninstall(false),
+        Some(Command::Uninstall) => install::uninstall(),
         Some(Command::Status) => install::status(),
         Some(Command::CheckUpdate) => update::check(),
         Some(Command::Update { dry_run }) => update::run(dry_run),

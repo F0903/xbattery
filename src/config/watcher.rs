@@ -14,7 +14,7 @@ const WRITE_DEBOUNCE: Duration = Duration::from_millis(250);
 type FileRevision = Vec<u8>;
 
 #[derive(Clone, Debug)]
-pub enum ConfigWatchEvent {
+pub(crate) enum ConfigWatchEvent {
     Loaded { path: PathBuf, config: AppConfig },
     Rejected(ConfigIssue),
 }

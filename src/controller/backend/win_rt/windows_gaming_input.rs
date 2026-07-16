@@ -4,7 +4,7 @@ use crate::AppResult;
 
 use super::{GamepadReport, RawControllerReport};
 
-pub fn raw_controller_reports() -> AppResult<Vec<RawControllerReport>> {
+pub(crate) fn raw_controller_reports() -> AppResult<Vec<RawControllerReport>> {
     let controllers = RawGameController::RawGameControllers()?;
     let mut reports = Vec::with_capacity(controllers.Size()? as usize);
 
@@ -28,7 +28,7 @@ pub fn raw_controller_reports() -> AppResult<Vec<RawControllerReport>> {
     Ok(reports)
 }
 
-pub fn gamepad_reports() -> AppResult<Vec<GamepadReport>> {
+pub(crate) fn gamepad_reports() -> AppResult<Vec<GamepadReport>> {
     let gamepads = Gamepad::Gamepads()?;
     let mut reports = Vec::with_capacity(gamepads.Size()? as usize);
 

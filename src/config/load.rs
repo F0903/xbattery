@@ -27,10 +27,6 @@ fn default_config_paths() -> AppResult<Vec<PathBuf>> {
     Ok(paths)
 }
 
-pub(super) fn load() -> AppResult<AppConfig> {
-    Ok(load_with_source()?.config)
-}
-
 pub(super) fn load_with_source() -> AppResult<LoadedAppConfig> {
     let Some(path) = selected_config_path()? else {
         return Ok(LoadedAppConfig::new(AppConfig::default(), None, None));

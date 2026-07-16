@@ -16,18 +16,18 @@ use crate::{
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct AppConfig {
-    pub monitor: MonitorConfig,
-    pub battery: BatteryConfig,
-    pub notifications: NotificationsConfig,
-    pub updates: UpdatesConfig,
+pub(crate) struct AppConfig {
+    pub(crate) monitor: MonitorConfig,
+    pub(crate) battery: BatteryConfig,
+    pub(crate) notifications: NotificationsConfig,
+    pub(crate) updates: UpdatesConfig,
 }
 
 #[derive(Clone, Debug)]
-pub struct LoadedAppConfig {
-    pub config: AppConfig,
-    pub path: Option<PathBuf>,
-    pub issue: Option<ConfigIssue>,
+pub(crate) struct LoadedAppConfig {
+    pub(crate) config: AppConfig,
+    pub(crate) path: Option<PathBuf>,
+    pub(crate) issue: Option<ConfigIssue>,
 }
 
 impl LoadedAppConfig {
@@ -45,12 +45,12 @@ impl LoadedAppConfig {
 }
 
 impl AppConfig {
-    pub fn load() -> AppResult<Self> {
-        load::load()
+    pub(crate) fn load() -> AppResult<Self> {
+        Ok(load::load_with_source()?.config)
     }
 
     #[cfg(debug_assertions)]
-    pub fn load_with_source() -> AppResult<LoadedAppConfig> {
+    pub(crate) fn load_with_source() -> AppResult<LoadedAppConfig> {
         load::load_with_source()
     }
 
@@ -58,7 +58,7 @@ impl AppConfig {
         load::load_for_monitor()
     }
 
-    pub fn load_from_path(path: impl AsRef<Path>) -> AppResult<Self> {
+    pub(crate) fn load_from_path(path: impl AsRef<Path>) -> AppResult<Self> {
         load::load_from_path(path)
     }
 
@@ -66,7 +66,7 @@ impl AppConfig {
         self.battery.resolve_relative_paths(base_dir);
     }
 
-    pub fn controller_service_config(&self) -> AppResult<ControllerServiceConfig> {
+    pub(crate) fn controller_service_config(&self) -> AppResult<ControllerServiceConfig> {
         Ok(ControllerServiceConfig::new(
             self.monitor.poll_interval(),
             self.monitor.control_wait_slice(),

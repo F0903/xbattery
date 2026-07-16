@@ -3,15 +3,15 @@ use std::time::Duration;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct UpdatesConfig {
-    pub repo_owner: String,
-    pub repo_name: String,
-    pub asset_identifier: String,
-    pub bin_path_in_archive: String,
-    pub check_automatically: bool,
-    pub check_interval_hours: u64,
-    pub auto_install: bool,
-    pub notify_available: bool,
+pub(crate) struct UpdatesConfig {
+    pub(crate) repo_owner: String,
+    pub(crate) repo_name: String,
+    pub(crate) asset_identifier: String,
+    pub(crate) bin_path_in_archive: String,
+    pub(crate) check_automatically: bool,
+    pub(crate) check_interval_hours: u64,
+    pub(crate) auto_install: bool,
+    pub(crate) notify_available: bool,
 }
 
 impl Default for UpdatesConfig {
@@ -30,7 +30,7 @@ impl Default for UpdatesConfig {
 }
 
 impl UpdatesConfig {
-    pub fn check_interval(&self) -> Duration {
+    pub(crate) fn check_interval(&self) -> Duration {
         Duration::from_secs(self.check_interval_hours.saturating_mul(60 * 60))
     }
 }

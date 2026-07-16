@@ -1,4 +1,5 @@
 use std::{
+    os::windows::process::CommandExt,
     path::{Path, PathBuf},
     process::Command,
     sync::{Arc, RwLock},
@@ -23,6 +24,7 @@ use super::{
 
 const STATE_FILE_NAME: &str = "update-state.toml";
 const CHECK_LOOP_GRANULARITY: Duration = Duration::from_secs(60);
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 pub(super) struct AutomaticUpdateLoop {
     config: Arc<RwLock<UpdatesConfig>>,
@@ -101,13 +103,7 @@ impl AutomaticUpdateLoop {
 fn spawn_update_process(installed_exe: &Path) -> AppResult<()> {
     let mut command = Command::new(installed_exe);
     command.arg("update");
-
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
+    command.creation_flags(CREATE_NO_WINDOW);
 
     command.spawn()?;
     Ok(())

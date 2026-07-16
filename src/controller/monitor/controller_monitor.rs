@@ -15,6 +15,7 @@ use super::super::Controller;
 
 // Guarded readings require a fresh sample after this delay before becoming user-visible.
 const READING_CONFIRMATION_DELAY: Duration = Duration::from_secs(6);
+const INITIAL_READING_RETRY_DELAY: Duration = Duration::from_millis(250);
 const MAX_DEFERRED_REFRESHES: u8 = 2;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -23,19 +24,48 @@ enum ConfirmationCandidate {
     Wired,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PendingReadingKind {
+    AwaitingUsable,
+    Confirming(ConfirmationCandidate),
+}
+
+impl PendingReadingKind {
+    fn retry_delay(self) -> Duration {
+        match self {
+            Self::AwaitingUsable => INITIAL_READING_RETRY_DELAY,
+            Self::Confirming(_) => READING_CONFIRMATION_DELAY,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PendingAnnouncement {
+    Connected,
+    BatteryStatus,
+}
+
 #[derive(Clone, Copy, Debug)]
-struct PendingConfirmation {
-    candidate: ConfirmationCandidate,
+struct PendingReading {
+    kind: PendingReadingKind,
     next_check: Instant,
     inconclusive_refreshes: u8,
     missing_refreshes: u8,
 }
 
-impl PendingConfirmation {
-    fn new(candidate: ConfirmationCandidate, now: Instant) -> Self {
+impl PendingReading {
+    fn awaiting_usable(now: Instant) -> Self {
+        Self::new(PendingReadingKind::AwaitingUsable, now)
+    }
+
+    fn confirming(candidate: ConfirmationCandidate, now: Instant) -> Self {
+        Self::new(PendingReadingKind::Confirming(candidate), now)
+    }
+
+    fn new(kind: PendingReadingKind, now: Instant) -> Self {
         Self {
-            candidate,
-            next_check: now + READING_CONFIRMATION_DELAY,
+            kind,
+            next_check: now + kind.retry_delay(),
             inconclusive_refreshes: 0,
             missing_refreshes: 0,
         }
@@ -56,7 +86,7 @@ impl PendingConfirmation {
             return false;
         }
 
-        self.next_check = now + READING_CONFIRMATION_DELAY;
+        self.next_check = now + self.kind.retry_delay();
         true
     }
 
@@ -67,7 +97,7 @@ impl PendingConfirmation {
             return false;
         }
 
-        self.next_check = now + READING_CONFIRMATION_DELAY;
+        self.next_check = now + self.kind.retry_delay();
         true
     }
 
@@ -82,7 +112,8 @@ impl PendingConfirmation {
 #[derive(Clone, Debug, Default)]
 pub struct ControllerMonitor {
     previous: Vec<Controller>,
-    pending_confirmations: HashMap<String, PendingConfirmation>,
+    pending_readings: HashMap<String, PendingReading>,
+    pending_announcements: HashMap<String, PendingAnnouncement>,
     warning_history: HashMap<String, HashMap<String, BatteryWarningLevel>>,
     warning_policy: BatteryWarningPolicy,
 }
@@ -91,7 +122,8 @@ impl ControllerMonitor {
     pub fn new(warning_policy: BatteryWarningPolicy) -> Self {
         Self {
             previous: Vec::new(),
-            pending_confirmations: HashMap::new(),
+            pending_readings: HashMap::new(),
+            pending_announcements: HashMap::new(),
             warning_history: HashMap::new(),
             warning_policy,
         }
@@ -112,12 +144,12 @@ impl ControllerMonitor {
         self.observe_pending_at(current, Instant::now())
     }
 
-    pub fn next_confirmation_delay(&self) -> Option<Duration> {
-        self.next_confirmation_delay_at(Instant::now())
+    pub fn next_refresh_delay(&self) -> Option<Duration> {
+        self.next_refresh_delay_at(Instant::now())
     }
 
-    pub fn defer_due_confirmations(&mut self) {
-        self.defer_due_confirmations_at(Instant::now());
+    pub fn defer_due_refreshes(&mut self) -> Vec<ControllerEvent> {
+        self.defer_due_refreshes_at(Instant::now())
     }
 
     #[cfg(test)]
@@ -129,8 +161,6 @@ impl ControllerMonitor {
     ) -> Vec<ControllerEvent> {
         if is_connected {
             self.observe_connected_at(controller, now)
-                .into_iter()
-                .collect()
         } else {
             self.observe_disconnected(controller.id())
                 .into_iter()
@@ -149,7 +179,7 @@ impl ControllerMonitor {
             .collect::<HashSet<_>>();
         let mut events = current
             .into_iter()
-            .filter_map(|controller| self.observe_connected_at(controller, now))
+            .flat_map(|controller| self.observe_connected_at(controller, now))
             .collect::<Vec<_>>();
         let disconnected_ids = self
             .previous
@@ -179,15 +209,13 @@ impl ControllerMonitor {
             .collect::<HashSet<_>>();
 
         for controller in current {
-            if self.pending_confirmations.contains_key(controller.id())
-                && let Some(event) = self.observe_connected_at(controller, now)
-            {
-                events.push(event);
+            if self.pending_readings.contains_key(controller.id()) {
+                events.extend(self.observe_connected_at(controller, now));
             }
         }
 
         let mut expired_missing = Vec::new();
-        self.pending_confirmations.retain(|id, pending| {
+        self.pending_readings.retain(|id, pending| {
             if current_ids.contains(id.as_str())
                 || !pending.is_due(now)
                 || pending.defer_missing(now)
@@ -211,7 +239,7 @@ impl ControllerMonitor {
         &mut self,
         controller: Controller,
         now: Instant,
-    ) -> Option<ControllerEvent> {
+    ) -> Vec<ControllerEvent> {
         let id = controller.id().to_string();
         let Some(index) = self
             .previous
@@ -220,90 +248,127 @@ impl ControllerMonitor {
         else {
             self.warning_history.remove(&id);
             let controller = if let Some(candidate) = confirmation_candidate(controller.battery()) {
-                self.pending_confirmations
-                    .insert(id, PendingConfirmation::new(candidate, now));
+                self.pending_readings
+                    .insert(id.clone(), PendingReading::confirming(candidate, now));
+                self.pending_announcements
+                    .insert(id.clone(), PendingAnnouncement::Connected);
                 let kind = match controller.battery().kind {
                     BatteryKind::Wired => BatteryKind::Unknown,
                     kind => kind,
                 };
                 controller.with_battery(BatteryReading::new(kind, BatteryCharge::Unknown))
+            } else if is_transient_unknown(controller.battery()) {
+                self.pending_readings
+                    .insert(id.clone(), PendingReading::awaiting_usable(now));
+                self.pending_announcements
+                    .insert(id.clone(), PendingAnnouncement::BatteryStatus);
+                controller
             } else {
                 controller
             };
 
             self.previous.push(controller.clone());
-            return Some(ControllerEvent::Connected(controller));
+            return match self.pending_announcements.get(&id) {
+                Some(PendingAnnouncement::Connected) => Vec::new(),
+                Some(PendingAnnouncement::BatteryStatus) | None => {
+                    vec![ControllerEvent::Connected(controller)]
+                }
+            };
         };
 
         let previous = self.previous[index].clone();
         let is_unknown = is_transient_unknown(controller.battery());
-        if let Some(pending) = self.pending_confirmations.get_mut(&id) {
+        if let Some(pending) = self.pending_readings.get_mut(&id) {
             pending.observe(!is_unknown);
         }
         if is_unknown {
             let abandon = self
-                .pending_confirmations
+                .pending_readings
                 .get_mut(&id)
                 .is_some_and(|pending| pending.is_due(now) && !pending.defer_inconclusive(now));
             if abandon {
-                self.pending_confirmations.remove(&id);
+                self.pending_readings.remove(&id);
             }
             self.previous[index] = preserve_known_battery(&previous, controller);
-            return None;
+            return if abandon {
+                self.release_pending_connected(&id).into_iter().collect()
+            } else {
+                Vec::new()
+            };
         }
 
         let needs_confirmation = needs_confirmation(previous.battery(), controller.battery());
         let candidate = confirmation_candidate(controller.battery());
         let confirmed = needs_confirmation
             && candidate.is_some_and(|candidate| {
-                self.pending_confirmations
-                    .get(&id)
-                    .is_some_and(|pending| pending.candidate == candidate && pending.is_due(now))
+                self.pending_readings.get(&id).is_some_and(|pending| {
+                    pending.kind == PendingReadingKind::Confirming(candidate) && pending.is_due(now)
+                })
             });
 
         if needs_confirmation && !confirmed {
             if let Some(candidate) = candidate {
-                self.pending_confirmations
+                self.pending_readings
                     .entry(id)
                     .and_modify(|pending| {
-                        if pending.candidate != candidate {
-                            *pending = PendingConfirmation::new(candidate, now);
+                        if pending.kind != PendingReadingKind::Confirming(candidate) {
+                            *pending = PendingReading::confirming(candidate, now);
                         }
                     })
-                    .or_insert_with(|| PendingConfirmation::new(candidate, now));
+                    .or_insert_with(|| PendingReading::confirming(candidate, now));
             }
-            return None;
+            return Vec::new();
         }
 
-        self.pending_confirmations.remove(&id);
+        self.pending_readings.remove(&id);
         self.clear_recovered_warnings(&id, controller.battery());
-        let warning = self.warning_between(&previous, &controller).or_else(|| {
-            (confirmed
-                && warning_requires_current_reading(
-                    previous.battery().charge,
-                    controller.battery().charge,
-                ))
-            .then(|| {
-                self.warning_policy
-                    .warning_for_current(controller.battery())
-            })
-            .flatten()
-        });
+        let warning = self
+            .warning_policy
+            .warning_between(previous.battery(), controller.battery())
+            .or_else(|| {
+                (confirmed
+                    && warning_requires_current_reading(
+                        previous.battery().charge,
+                        controller.battery().charge,
+                    ))
+                .then(|| {
+                    self.warning_policy
+                        .warning_for_current(controller.battery())
+                })
+                .flatten()
+            });
         let warning = warning.filter(|warning| self.should_emit_warning(&id, warning));
         if let Some(warning) = &warning {
             let level = warning.level().clone();
             self.warning_history
-                .entry(id)
+                .entry(id.clone())
                 .or_default()
                 .insert(level.name().to_string(), level);
         }
-        self.previous[index] = controller;
+        self.previous[index] = controller.clone();
 
-        warning.map(|warning| ControllerEvent::BatteryWarning { warning })
+        match self.pending_announcements.remove(&id) {
+            Some(PendingAnnouncement::Connected) => {
+                let mut events = vec![ControllerEvent::Connected(controller)];
+                events.extend(warning.map(|warning| ControllerEvent::BatteryWarning { warning }));
+                events
+            }
+            Some(PendingAnnouncement::BatteryStatus) => {
+                vec![ControllerEvent::BatteryStatus {
+                    controller,
+                    warning,
+                }]
+            }
+            None => warning
+                .map(|warning| ControllerEvent::BatteryWarning { warning })
+                .into_iter()
+                .collect(),
+        }
     }
 
     fn observe_disconnected(&mut self, id: &str) -> Option<ControllerEvent> {
-        self.pending_confirmations.remove(id);
+        self.pending_readings.remove(id);
+        self.pending_announcements.remove(id);
         self.warning_history.remove(id);
         let index = self
             .previous
@@ -313,16 +378,40 @@ impl ControllerMonitor {
         Some(ControllerEvent::Disconnected(self.previous.remove(index)))
     }
 
-    fn next_confirmation_delay_at(&self, now: Instant) -> Option<Duration> {
-        self.pending_confirmations
+    fn next_refresh_delay_at(&self, now: Instant) -> Option<Duration> {
+        self.pending_readings
             .values()
             .map(|pending| pending.delay(now))
             .min()
     }
 
-    fn defer_due_confirmations_at(&mut self, now: Instant) {
-        self.pending_confirmations
-            .retain(|_, pending| !pending.is_due(now) || pending.defer_inconclusive(now));
+    fn defer_due_refreshes_at(&mut self, now: Instant) -> Vec<ControllerEvent> {
+        let mut abandoned = Vec::new();
+        self.pending_readings.retain(|id, pending| {
+            let keep = !pending.is_due(now) || pending.defer_inconclusive(now);
+            if !keep {
+                abandoned.push(id.clone());
+            }
+            keep
+        });
+
+        abandoned
+            .into_iter()
+            .filter_map(|id| self.release_pending_connected(&id))
+            .collect()
+    }
+
+    fn release_pending_connected(&mut self, id: &str) -> Option<ControllerEvent> {
+        if self.pending_announcements.get(id) != Some(&PendingAnnouncement::Connected) {
+            return None;
+        }
+        self.pending_announcements.remove(id);
+
+        self.previous
+            .iter()
+            .find(|controller| controller.id() == id)
+            .cloned()
+            .map(ControllerEvent::Connected)
     }
 
     fn clear_recovered_warnings(&mut self, id: &str, current: BatteryReading) {
@@ -352,15 +441,6 @@ impl ControllerMonitor {
             .get(id)
             .is_none_or(|history| !history.contains_key(warning.level().name()))
     }
-
-    fn warning_between(
-        &self,
-        previous: &Controller,
-        current: &Controller,
-    ) -> Option<BatteryWarning> {
-        self.warning_policy
-            .warning_between(previous.battery(), current.battery())
-    }
 }
 
 fn preserve_known_battery(previous: &Controller, current: Controller) -> Controller {
@@ -378,10 +458,6 @@ fn is_transient_unknown(reading: BatteryReading) -> bool {
     reading.kind != BatteryKind::Wired && reading.charge.is_unknown()
 }
 
-fn requires_confirmation(reading: BatteryReading) -> bool {
-    confirmation_candidate(reading).is_some()
-}
-
 fn confirmation_candidate(reading: BatteryReading) -> Option<ConfirmationCandidate> {
     if reading.kind == BatteryKind::Wired {
         Some(ConfirmationCandidate::Wired)
@@ -397,7 +473,7 @@ fn confirmation_candidate(reading: BatteryReading) -> Option<ConfirmationCandida
 }
 
 fn needs_confirmation(previous: BatteryReading, current: BatteryReading) -> bool {
-    if !requires_confirmation(current) {
+    if confirmation_candidate(current).is_none() {
         return false;
     }
 
@@ -453,7 +529,10 @@ mod tests {
 
     use std::time::{Duration, Instant};
 
-    use super::{ControllerMonitor, MAX_DEFERRED_REFRESHES, READING_CONFIRMATION_DELAY};
+    use super::{
+        ControllerMonitor, INITIAL_READING_RETRY_DELAY, MAX_DEFERRED_REFRESHES,
+        READING_CONFIRMATION_DELAY,
+    };
 
     #[test]
     fn emits_connected_event_for_new_controller() {
@@ -463,6 +542,262 @@ mod tests {
         let events = monitor.observe_current(vec![controller.clone()]);
 
         assert_eq!(events, vec![ControllerEvent::Connected(controller)]);
+    }
+
+    #[test]
+    fn unknown_initial_reading_emits_a_generic_connected_event_and_schedules_a_retry() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+
+        let events = monitor.observe_current_at(vec![unknown.clone()], now);
+
+        assert_eq!(events, vec![ControllerEvent::Connected(unknown)]);
+        assert_eq!(
+            monitor.next_refresh_delay_at(now),
+            Some(INITIAL_READING_RETRY_DELAY)
+        );
+    }
+
+    #[test]
+    fn first_usable_reading_after_unknown_emits_one_battery_status() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+        let full = controller("one", BatteryCharge::Coarse(BatteryLevel::Full));
+        monitor.observe_current_at(vec![unknown], now);
+
+        let status =
+            monitor.observe_current_at(vec![full.clone()], now + INITIAL_READING_RETRY_DELAY);
+        let repeated = monitor.observe_current_at(
+            vec![full.clone()],
+            now + INITIAL_READING_RETRY_DELAY + Duration::from_secs(1),
+        );
+
+        assert_eq!(
+            status,
+            vec![ControllerEvent::BatteryStatus {
+                controller: full,
+                warning: None,
+            }]
+        );
+        assert!(repeated.is_empty());
+        assert_eq!(
+            monitor.next_refresh_delay_at(now + INITIAL_READING_RETRY_DELAY),
+            None
+        );
+    }
+
+    #[test]
+    fn unknown_initial_reading_gets_three_accelerated_retries() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+        monitor.observe_current_at(vec![unknown.clone()], now);
+
+        for attempt in 1..=MAX_DEFERRED_REFRESHES {
+            let refresh_at = now + INITIAL_READING_RETRY_DELAY * u32::from(attempt);
+            assert!(
+                monitor
+                    .observe_pending_at(vec![unknown.clone()], refresh_at)
+                    .is_empty()
+            );
+            assert_eq!(
+                monitor.next_refresh_delay_at(refresh_at),
+                Some(INITIAL_READING_RETRY_DELAY)
+            );
+        }
+
+        let final_retry = now + INITIAL_READING_RETRY_DELAY * u32::from(MAX_DEFERRED_REFRESHES + 1);
+        assert!(
+            monitor
+                .observe_pending_at(vec![unknown], final_retry)
+                .is_empty()
+        );
+        assert_eq!(monitor.next_refresh_delay_at(final_retry), None);
+    }
+
+    #[test]
+    fn retry_exhaustion_keeps_the_later_battery_status_announcement() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+        let full = controller("one", BatteryCharge::Coarse(BatteryLevel::Full));
+        monitor.observe_current_at(vec![unknown.clone()], now);
+
+        for attempt in 1..=MAX_DEFERRED_REFRESHES + 1 {
+            let refresh_at = now + INITIAL_READING_RETRY_DELAY * u32::from(attempt);
+            assert!(
+                monitor
+                    .observe_pending_at(vec![unknown.clone()], refresh_at)
+                    .is_empty()
+            );
+        }
+
+        let later = now + Duration::from_secs(60);
+        assert_eq!(
+            monitor.observe_current_at(vec![full.clone()], later),
+            vec![ControllerEvent::BatteryStatus {
+                controller: full,
+                warning: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn initial_unknown_to_low_folds_the_warning_into_one_confirmed_status() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+        let critical = controller("one", BatteryCharge::Precise(10));
+        monitor.observe_current_at(vec![unknown], now);
+        let low_seen = now + INITIAL_READING_RETRY_DELAY;
+
+        assert!(
+            monitor
+                .observe_current_at(vec![critical.clone()], low_seen)
+                .is_empty()
+        );
+        assert!(
+            monitor
+                .observe_pending_at(
+                    vec![critical.clone()],
+                    low_seen + READING_CONFIRMATION_DELAY - Duration::from_millis(1),
+                )
+                .is_empty()
+        );
+
+        assert_eq!(
+            monitor.observe_pending_at(
+                vec![critical.clone()],
+                low_seen + READING_CONFIRMATION_DELAY,
+            ),
+            vec![ControllerEvent::BatteryStatus {
+                controller: critical,
+                warning: Some(critical_warning_value()),
+            }]
+        );
+    }
+
+    #[test]
+    fn initial_unknown_to_wired_waits_for_confirmation_before_status() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+        let wired = wired_controller("one");
+        monitor.observe_current_at(vec![unknown], now);
+        let wired_seen = now + INITIAL_READING_RETRY_DELAY;
+
+        assert!(
+            monitor
+                .observe_current_at(vec![wired.clone()], wired_seen)
+                .is_empty()
+        );
+        assert_eq!(
+            monitor
+                .observe_pending_at(vec![wired.clone()], wired_seen + READING_CONFIRMATION_DELAY,),
+            vec![ControllerEvent::BatteryStatus {
+                controller: wired,
+                warning: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn usable_wireless_reading_supersedes_pending_wired_status_immediately() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+        let wired = wired_controller("one");
+        let full = controller("one", BatteryCharge::Coarse(BatteryLevel::Full));
+        monitor.observe_current_at(vec![unknown], now);
+        monitor.observe_current_at(vec![wired], now + INITIAL_READING_RETRY_DELAY);
+
+        assert_eq!(
+            monitor.observe_current_at(
+                vec![full.clone()],
+                now + INITIAL_READING_RETRY_DELAY + Duration::from_millis(250),
+            ),
+            vec![ControllerEvent::BatteryStatus {
+                controller: full,
+                warning: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn switching_low_to_wired_restarts_unknown_status_confirmation() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+        let critical = controller("one", BatteryCharge::Precise(10));
+        let wired = wired_controller("one");
+        monitor.observe_current_at(vec![unknown], now);
+        let low_seen = now + INITIAL_READING_RETRY_DELAY;
+        monitor.observe_current_at(vec![critical], low_seen);
+        let wired_seen = low_seen + READING_CONFIRMATION_DELAY - Duration::from_millis(100);
+        monitor.observe_current_at(vec![wired.clone()], wired_seen);
+
+        assert!(
+            monitor
+                .observe_pending_at(vec![wired.clone()], low_seen + READING_CONFIRMATION_DELAY)
+                .is_empty()
+        );
+        assert_eq!(
+            monitor.next_refresh_delay_at(low_seen + READING_CONFIRMATION_DELAY),
+            Some(READING_CONFIRMATION_DELAY - Duration::from_millis(100))
+        );
+        assert_eq!(
+            monitor
+                .observe_pending_at(vec![wired.clone()], wired_seen + READING_CONFIRMATION_DELAY,),
+            vec![ControllerEvent::BatteryStatus {
+                controller: wired,
+                warning: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn disconnect_clears_pending_unknown_status_before_reconnect() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+        let full = controller("one", BatteryCharge::Coarse(BatteryLevel::Full));
+        assert_eq!(
+            monitor.observe_current_at(vec![unknown.clone()], now),
+            vec![ControllerEvent::Connected(unknown.clone())]
+        );
+
+        assert_eq!(
+            monitor.observe_current_at(Vec::new(), now + Duration::from_millis(100)),
+            vec![ControllerEvent::Disconnected(unknown)]
+        );
+        assert_eq!(
+            monitor.observe_current_at(vec![full.clone()], now + Duration::from_millis(200)),
+            vec![ControllerEvent::Connected(full)]
+        );
+    }
+
+    #[test]
+    fn refresh_error_exhaustion_keeps_the_unknown_status_announcement() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let unknown = controller("one", BatteryCharge::Unknown);
+        let medium = controller("one", BatteryCharge::Coarse(BatteryLevel::Medium));
+        monitor.observe_current_at(vec![unknown], now);
+
+        for attempt in 1..=MAX_DEFERRED_REFRESHES + 1 {
+            let refresh_at = now + INITIAL_READING_RETRY_DELAY * u32::from(attempt);
+            assert!(monitor.defer_due_refreshes_at(refresh_at).is_empty());
+        }
+
+        assert_eq!(
+            monitor.observe_current_at(vec![medium.clone()], now + Duration::from_secs(60)),
+            vec![ControllerEvent::BatteryStatus {
+                controller: medium,
+                warning: None,
+            }]
+        );
     }
 
     #[test]
@@ -594,53 +929,36 @@ mod tests {
     }
 
     #[test]
-    fn hides_an_unconfirmed_critical_level_on_initial_connection() {
+    fn defers_the_connected_event_for_an_unconfirmed_critical_level() {
         let now = Instant::now();
         let mut monitor = ControllerMonitor::default();
         let critical = controller("one", BatteryCharge::Precise(10));
 
         let events = monitor.observe_incremental_at(critical, true, now);
 
-        assert_eq!(
-            events,
-            vec![ControllerEvent::Connected(controller(
-                "one",
-                BatteryCharge::Unknown
-            ))]
-        );
-        assert_eq!(
-            events[0]
-                .notification(&ControllerNotificationPolicy::default())
-                .unwrap()
-                .body(),
-            "Controller is connected"
-        );
+        assert!(events.is_empty());
     }
 
     #[test]
-    fn hides_an_unconfirmed_wired_classification_on_initial_connection() {
+    fn defers_the_connected_event_for_an_unconfirmed_wired_classification() {
         let now = Instant::now();
         let mut monitor = ControllerMonitor::default();
         let wired = Controller::new(
             "one",
             BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown),
         );
-        let provisional = controller("one", BatteryCharge::Unknown);
-
         let connected = monitor.observe_incremental_at(wired.clone(), true, now);
 
-        assert_eq!(connected, vec![ControllerEvent::Connected(provisional)]);
+        assert!(connected.is_empty());
+        let confirmed =
+            monitor.observe_pending_at(vec![wired.clone()], now + READING_CONFIRMATION_DELAY);
+        assert_eq!(confirmed, vec![ControllerEvent::Connected(wired.clone())]);
         assert_eq!(
-            connected[0]
+            confirmed[0]
                 .notification(&ControllerNotificationPolicy::default())
                 .unwrap()
                 .body(),
-            "Controller is connected"
-        );
-        assert!(
-            monitor
-                .observe_pending_at(vec![wired.clone()], now + READING_CONFIRMATION_DELAY)
-                .is_empty()
+            "Battery level is wired"
         );
         assert_eq!(
             monitor.observe_incremental_at(
@@ -649,6 +967,36 @@ mod tests {
                 now + READING_CONFIRMATION_DELAY + Duration::from_secs(1),
             ),
             vec![ControllerEvent::Disconnected(wired)]
+        );
+    }
+
+    #[test]
+    fn settled_wireless_reading_is_used_in_the_connected_notification() {
+        let now = Instant::now();
+        let mut monitor = ControllerMonitor::default();
+        let wired = Controller::new(
+            "one",
+            BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown),
+        );
+        let full = Controller::new(
+            "one",
+            BatteryReading::new(
+                BatteryKind::Alkaline,
+                BatteryCharge::Coarse(BatteryLevel::Full),
+            ),
+        );
+
+        assert!(monitor.observe_current_at(vec![wired], now).is_empty());
+        let events =
+            monitor.observe_current_at(vec![full.clone()], now + Duration::from_millis(250));
+
+        assert_eq!(events, vec![ControllerEvent::Connected(full)]);
+        assert_eq!(
+            events[0]
+                .notification(&ControllerNotificationPolicy::default())
+                .unwrap()
+                .body(),
+            "Battery level is ~100%"
         );
     }
 
@@ -698,7 +1046,7 @@ mod tests {
                 .is_empty()
         );
         assert_eq!(
-            monitor.next_confirmation_delay_at(old_deadline),
+            monitor.next_refresh_delay_at(old_deadline),
             Some(READING_CONFIRMATION_DELAY - Duration::from_millis(100))
         );
 
@@ -708,7 +1056,7 @@ mod tests {
                 .observe_incremental_at(wired.clone(), true, new_deadline)
                 .is_empty()
         );
-        assert_eq!(monitor.next_confirmation_delay_at(new_deadline), None);
+        assert_eq!(monitor.next_refresh_delay_at(new_deadline), None);
         assert_eq!(
             monitor.observe_incremental_at(
                 wired.clone(),
@@ -739,14 +1087,14 @@ mod tests {
                 .is_empty()
         );
         assert_eq!(
-            monitor.next_confirmation_delay_at(old_deadline),
+            monitor.next_refresh_delay_at(old_deadline),
             Some(READING_CONFIRMATION_DELAY - Duration::from_millis(100))
         );
 
         let new_deadline = low_seen + READING_CONFIRMATION_DELAY;
         assert_eq!(
-            monitor.observe_incremental_at(low, true, new_deadline),
-            vec![critical_warning()]
+            monitor.observe_incremental_at(low.clone(), true, new_deadline),
+            vec![ControllerEvent::Connected(low), critical_warning()]
         );
     }
 
@@ -772,9 +1120,8 @@ mod tests {
                 .is_empty()
         );
         assert_eq!(
-            monitor.next_confirmation_delay_at(
-                now + READING_CONFIRMATION_DELAY + Duration::from_secs(1)
-            ),
+            monitor
+                .next_refresh_delay_at(now + READING_CONFIRMATION_DELAY + Duration::from_secs(1)),
             None
         );
         assert_eq!(
@@ -798,14 +1145,17 @@ mod tests {
         let deadline = now + READING_CONFIRMATION_DELAY;
         assert_eq!(
             monitor.observe_pending_at(vec![critical.clone()], deadline),
-            vec![critical_warning()]
+            vec![
+                ControllerEvent::Connected(critical.clone()),
+                critical_warning()
+            ]
         );
         assert!(
             monitor
                 .observe_incremental_at(unknown, true, deadline)
                 .is_empty()
         );
-        assert_eq!(monitor.next_confirmation_delay_at(deadline), None);
+        assert_eq!(monitor.next_refresh_delay_at(deadline), None);
         assert_eq!(
             monitor.observe_incremental_at(
                 critical.clone(),
@@ -826,12 +1176,25 @@ mod tests {
         let events =
             monitor.observe_pending_at(vec![critical.clone()], now + READING_CONFIRMATION_DELAY);
         let repeated = monitor.observe_incremental_at(
-            critical,
+            critical.clone(),
             true,
             now + READING_CONFIRMATION_DELAY + Duration::from_secs(1),
         );
 
-        assert_eq!(events, vec![critical_warning()]);
+        assert_eq!(
+            events,
+            vec![
+                ControllerEvent::Connected(critical.clone()),
+                critical_warning()
+            ]
+        );
+        assert_eq!(
+            events[0]
+                .notification(&ControllerNotificationPolicy::default())
+                .unwrap()
+                .body(),
+            "Battery level is 10%"
+        );
         assert!(repeated.is_empty());
     }
 
@@ -896,7 +1259,7 @@ mod tests {
                 .observe_current_at(vec![wired.clone()], confirmed_at)
                 .is_empty()
         );
-        assert_eq!(monitor.next_confirmation_delay_at(confirmed_at), None);
+        assert_eq!(monitor.next_refresh_delay_at(confirmed_at), None);
         assert_eq!(
             monitor.observe_current_at(Vec::new(), confirmed_at + Duration::from_secs(1)),
             vec![ControllerEvent::Disconnected(wired)]
@@ -945,8 +1308,12 @@ mod tests {
         let precise_empty = controller("one", BatteryCharge::Precise(9));
         monitor.observe_current_at(vec![coarse_empty.clone()], now);
         assert_eq!(
-            monitor.observe_current_at(vec![coarse_empty], now + READING_CONFIRMATION_DELAY,),
-            vec![coarse_empty_warning()]
+            monitor
+                .observe_current_at(vec![coarse_empty.clone()], now + READING_CONFIRMATION_DELAY,),
+            vec![
+                ControllerEvent::Connected(coarse_empty),
+                coarse_empty_warning()
+            ]
         );
         monitor.set_warning_policy(BatteryWarningPolicy::default());
 
@@ -1099,7 +1466,7 @@ mod tests {
                 .is_empty()
         );
         assert_eq!(
-            monitor.next_confirmation_delay_at(first_seen + READING_CONFIRMATION_DELAY),
+            monitor.next_refresh_delay_at(first_seen + READING_CONFIRMATION_DELAY),
             Some(READING_CONFIRMATION_DELAY)
         );
         let events = monitor.observe_pending_at(
@@ -1137,7 +1504,7 @@ mod tests {
             ))]
         );
 
-        assert_eq!(monitor.next_confirmation_delay_at(final_refresh), None);
+        assert_eq!(monitor.next_refresh_delay_at(final_refresh), None);
     }
 
     #[test]
@@ -1166,8 +1533,8 @@ mod tests {
 
         let confirmed_at = missing_at + READING_CONFIRMATION_DELAY;
         assert_eq!(
-            monitor.observe_pending_at(vec![critical], confirmed_at),
-            vec![critical_warning()]
+            monitor.observe_pending_at(vec![critical.clone()], confirmed_at),
+            vec![ControllerEvent::Connected(critical), critical_warning()]
         );
     }
 
@@ -1177,17 +1544,20 @@ mod tests {
         let mut monitor = ControllerMonitor::default();
         monitor.observe_incremental_at(controller("one", BatteryCharge::Precise(10)), true, now);
 
-        for attempt in 1..=MAX_DEFERRED_REFRESHES + 1 {
+        for attempt in 1..=MAX_DEFERRED_REFRESHES {
             let refresh_at = now + READING_CONFIRMATION_DELAY * u32::from(attempt);
-            monitor.defer_due_confirmations_at(refresh_at);
+            assert!(monitor.defer_due_refreshes_at(refresh_at).is_empty());
         }
 
+        let abandoned_at = now + READING_CONFIRMATION_DELAY * u32::from(MAX_DEFERRED_REFRESHES + 1);
         assert_eq!(
-            monitor.next_confirmation_delay_at(
-                now + READING_CONFIRMATION_DELAY * u32::from(MAX_DEFERRED_REFRESHES + 1),
-            ),
-            None
+            monitor.defer_due_refreshes_at(abandoned_at),
+            vec![ControllerEvent::Connected(controller(
+                "one",
+                BatteryCharge::Unknown
+            ))]
         );
+        assert_eq!(monitor.next_refresh_delay_at(abandoned_at), None);
     }
 
     #[test]
@@ -1217,8 +1587,8 @@ mod tests {
 
         let confirmed_at = now + READING_CONFIRMATION_DELAY * u32::from(MAX_DEFERRED_REFRESHES + 2);
         assert_eq!(
-            monitor.observe_pending_at(vec![critical], confirmed_at),
-            vec![critical_warning()]
+            monitor.observe_pending_at(vec![critical.clone()], confirmed_at),
+            vec![ControllerEvent::Connected(critical), critical_warning()]
         );
     }
 
@@ -1234,7 +1604,7 @@ mod tests {
         let disconnected =
             monitor.observe_incremental_at(critical.clone(), false, now + Duration::from_secs(2));
         assert_eq!(
-            monitor.next_confirmation_delay_at(now + Duration::from_secs(2)),
+            monitor.next_refresh_delay_at(now + Duration::from_secs(2)),
             None
         );
         let reconnected_at = now + Duration::from_secs(3);
@@ -1245,21 +1615,18 @@ mod tests {
             reconnected_at + READING_CONFIRMATION_DELAY - Duration::from_millis(1),
         );
         let confirmed = monitor.observe_incremental_at(
-            critical,
+            critical.clone(),
             true,
             reconnected_at + READING_CONFIRMATION_DELAY,
         );
 
         assert_eq!(disconnected, vec![ControllerEvent::Disconnected(full)]);
-        assert_eq!(
-            reconnected,
-            vec![ControllerEvent::Connected(controller(
-                "one",
-                BatteryCharge::Unknown
-            ))]
-        );
+        assert!(reconnected.is_empty());
         assert!(before_new_deadline.is_empty());
-        assert_eq!(confirmed, vec![critical_warning()]);
+        assert_eq!(
+            confirmed,
+            vec![ControllerEvent::Connected(critical), critical_warning()]
+        );
     }
 
     #[test]
@@ -1283,20 +1650,31 @@ mod tests {
         Controller::new(id, BatteryReading::new(BatteryKind::Unknown, charge))
     }
 
+    fn wired_controller(id: &str) -> Controller {
+        Controller::new(
+            id,
+            BatteryReading::new(BatteryKind::Wired, BatteryCharge::Unknown),
+        )
+    }
+
     fn critical_warning() -> ControllerEvent {
         ControllerEvent::BatteryWarning {
-            warning: BatteryWarning::precise(
-                10,
-                BatteryWarningLevel::new(
-                    "empty",
-                    Some(10),
-                    Some(BatteryLevel::Empty),
-                    true,
-                    true,
-                    None,
-                ),
-            ),
+            warning: critical_warning_value(),
         }
+    }
+
+    fn critical_warning_value() -> BatteryWarning {
+        BatteryWarning::precise(
+            10,
+            BatteryWarningLevel::new(
+                "empty",
+                Some(10),
+                Some(BatteryLevel::Empty),
+                true,
+                true,
+                None,
+            ),
+        )
     }
 
     fn precise_medium_warning() -> ControllerEvent {

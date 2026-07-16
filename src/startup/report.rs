@@ -6,7 +6,6 @@ use super::TASK_NAME;
 pub struct InstallReport {
     pub installed_exe: PathBuf,
     pub installed_config: PathBuf,
-    pub started_monitor: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -18,11 +17,10 @@ pub struct UninstallReport {
 impl InstallReport {
     pub fn summary(&self) -> String {
         format!(
-            "xbattery is installed.\n\nExecutable: {}\nConfig: {}\nStartup task: {}\nMonitor started: {}",
+            "xbattery is installed.\n\nExecutable: {}\nConfig: {}\nStartup task: {}\nMonitor started: yes",
             self.installed_exe.display(),
             self.installed_config.display(),
             TASK_NAME,
-            if self.started_monitor { "yes" } else { "no" }
         )
     }
 }

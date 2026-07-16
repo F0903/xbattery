@@ -2,18 +2,24 @@ use crate::{
     audio::AudioClip,
     controller::{
         Controller,
-        battery::{BatteryCharge, BatteryKind, BatteryReading, BatteryWarning},
+        battery::{BatteryReading, BatteryWarning},
     },
     notifier::Notification,
 };
 
-use super::ControllerNotificationPolicy;
+use super::{ControllerNotificationPolicy, controller_notification_policy::battery_level_text};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ControllerEvent {
     Connected(Controller),
     Disconnected(Controller),
-    BatteryWarning { warning: BatteryWarning },
+    BatteryStatus {
+        controller: Controller,
+        warning: Option<BatteryWarning>,
+    },
+    BatteryWarning {
+        warning: BatteryWarning,
+    },
 }
 
 impl ControllerEvent {
@@ -29,6 +35,10 @@ impl ControllerEvent {
                 "Xbox Controller Disconnected",
                 disconnected_body(controller.battery()),
             )),
+            Self::BatteryStatus {
+                controller,
+                warning,
+            } => policy.notification_for_battery_status(controller, warning.as_ref()),
             Self::BatteryWarning { warning } if warning.level().notify() => {
                 Some(policy.notification_for_battery_warning(warning))
             }
@@ -38,6 +48,9 @@ impl ControllerEvent {
 
     pub fn audio(&self) -> Option<&AudioClip> {
         match self {
+            Self::BatteryStatus { warning, .. } => {
+                warning.as_ref().and_then(|warning| warning.level().audio())
+            }
             Self::BatteryWarning { warning } => warning.level().audio(),
             Self::Connected(_) | Self::Disconnected(_) => None,
         }
@@ -57,19 +70,5 @@ fn disconnected_body(battery: BatteryReading) -> String {
             format!("Controller has been disconnected. Last known battery level was {level}")
         }
         None => "Controller has been disconnected".to_string(),
-    }
-}
-
-fn battery_level_text(battery: BatteryReading) -> Option<String> {
-    if battery.kind == BatteryKind::Wired {
-        return Some("wired".to_string());
-    }
-
-    match battery.charge {
-        BatteryCharge::Precise(percent) => Some(format!("{percent}%")),
-        BatteryCharge::Coarse(level) => level
-            .estimated_percent()
-            .map(|percent| format!("~{percent}%")),
-        BatteryCharge::Unknown => None,
     }
 }

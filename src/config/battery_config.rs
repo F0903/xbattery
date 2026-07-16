@@ -21,66 +21,66 @@ use crate::{
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct BatteryConfig {
-    pub levels: Option<BTreeMap<String, BatteryLevelConfig>>,
+pub(crate) struct BatteryConfig {
+    pub(crate) levels: Option<BTreeMap<String, BatteryLevelConfig>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct BatteryLevelConfig {
-    pub threshold_percent: Option<u8>,
-    pub coarse_level: Option<BatteryLevel>,
-    pub notify: Option<bool>,
-    pub urgent: bool,
-    pub sound_file: Option<PathBuf>,
-    pub generated_sound: Option<AudioRecipeConfig>,
+pub(crate) struct BatteryLevelConfig {
+    pub(crate) threshold_percent: Option<u8>,
+    pub(crate) coarse_level: Option<BatteryLevel>,
+    pub(crate) notify: Option<bool>,
+    pub(crate) urgent: bool,
+    pub(crate) sound_file: Option<PathBuf>,
+    pub(crate) generated_sound: Option<AudioRecipeConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct AudioRecipeConfig {
-    pub sample_rate: Option<u32>,
-    pub segments: Vec<AudioSegmentConfig>,
-    pub roll: Vec<AudioRollEventConfig>,
-    pub effects: Vec<AudioEffectConfig>,
+pub(crate) struct AudioRecipeConfig {
+    pub(crate) sample_rate: Option<u32>,
+    pub(crate) segments: Vec<AudioSegmentConfig>,
+    pub(crate) roll: Vec<AudioRollEventConfig>,
+    pub(crate) effects: Vec<AudioEffectConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct AudioSegmentConfig {
-    pub kind: AudioSegmentKind,
-    pub notes: String,
-    pub duration_seconds: f32,
-    pub volume: Option<f32>,
+pub(crate) struct AudioSegmentConfig {
+    pub(crate) kind: AudioSegmentKind,
+    pub(crate) notes: String,
+    pub(crate) duration_seconds: f32,
+    pub(crate) volume: Option<f32>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct AudioRollEventConfig {
-    pub notes: String,
-    pub at: Option<f32>,
-    pub length: f32,
-    pub gain: Option<f32>,
-    pub wave: WaveformConfig,
-    pub adsr: Option<[f32; 4]>,
+pub(crate) struct AudioRollEventConfig {
+    pub(crate) notes: String,
+    pub(crate) at: Option<f32>,
+    pub(crate) length: f32,
+    pub(crate) gain: Option<f32>,
+    pub(crate) wave: WaveformConfig,
+    pub(crate) adsr: Option<[f32; 4]>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct AudioEffectConfig {
-    pub kind: AudioEffectKind,
-    pub cutoff_hz: Option<f32>,
-    pub delay_seconds: Option<f32>,
-    pub feedback: Option<f32>,
-    pub room_seconds: Option<f32>,
-    pub damping: Option<f32>,
-    pub mix: Option<f32>,
-    pub drive: Option<f32>,
+pub(crate) struct AudioEffectConfig {
+    pub(crate) kind: AudioEffectKind,
+    pub(crate) cutoff_hz: Option<f32>,
+    pub(crate) delay_seconds: Option<f32>,
+    pub(crate) feedback: Option<f32>,
+    pub(crate) room_seconds: Option<f32>,
+    pub(crate) damping: Option<f32>,
+    pub(crate) mix: Option<f32>,
+    pub(crate) drive: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum AudioSegmentKind {
+pub(crate) enum AudioSegmentKind {
     #[default]
     Tone,
     Silence,
@@ -88,7 +88,7 @@ pub enum AudioSegmentKind {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
-pub enum WaveformConfig {
+pub(crate) enum WaveformConfig {
     #[default]
     Sine,
     Triangle,
@@ -98,7 +98,7 @@ pub enum WaveformConfig {
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
-pub enum AudioEffectKind {
+pub(crate) enum AudioEffectKind {
     #[default]
     Delay,
     LowPass,
@@ -107,7 +107,7 @@ pub enum AudioEffectKind {
 }
 
 impl BatteryConfig {
-    pub fn warning_levels(&self) -> AppResult<Vec<BatteryWarningLevel>> {
+    pub(crate) fn warning_levels(&self) -> AppResult<Vec<BatteryWarningLevel>> {
         match &self.levels {
             Some(levels) => levels
                 .iter()

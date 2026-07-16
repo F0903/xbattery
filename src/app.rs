@@ -1,13 +1,13 @@
 use windows::Win32::System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx};
 
-use crate::{AppResult, cli, console::Console, launch_context::LaunchContext};
+use crate::{AppResult, cli, console, launch_context::LaunchContext};
 
 pub fn run() -> AppResult<()> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     let launch_context = LaunchContext::current();
 
     if should_attach_console(&args, &launch_context) {
-        Console::attach_to_parent()?;
+        console::attach_to_parent()?;
     }
 
     init_com()?;
